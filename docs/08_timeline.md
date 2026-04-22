@@ -23,6 +23,7 @@ Each target is a **gate**, not a commitment. We decide at each gate whether we g
 - **C1 reference implementation** lands in a branch; passes smoke tests.
 - **MLP and scrambled-edge ablations** complete — we know whether the graph is load-bearing by end of month.
 - **Topology-split v1** frozen in `configs/topology_split_v1.yaml`.
+- **Feeder atlas v0** (C6): every existing feeder catalogued with basic structural features in `configs/feeder_atlas.yaml`.
 
 **Exit condition.** At least one cross-topology result exists, even if weak. If transfer is uniformly catastrophic, we reframe in June instead of continuing.
 
@@ -30,13 +31,15 @@ Each target is a **gate**, not a commitment. We decide at each gate whether we g
 - **C2 topology-transfer** full sweep on v1 split.
 - **C5 baseline zoo** implemented (GCN, GAT, GIN, EGNN, Graph Transformer).
 - **Main result table** populated for the workshop draft.
+- **d_struct v0** (C6): first implementation; pairwise distances computed on the atlas; eyeball check that distances track topology intuitions.
 
 **Exit condition.** Draft tables for main result + transfer gap. Workshop go/no-go decision.
 
 ### 2026-07
 - **C3 differentiable projection** implemented; feasibility invariant at 0 violations.
 - **C4 CVaR-minimax training** implemented; comparison against lexicographic selection.
-- **Theory sketches** for Theorems 1 and 2 complete in prose (proofs still rough).
+- **d_struct ↔ transfer-gap correlation** (C6): first R² measurement across splits. This is the make-or-break signal for the C6 headline claim.
+- **Theory sketches** for Theorems 1 and 2 complete in prose (proofs still rough). Theorem 1 written in d_struct form, not abstract d_WL.
 - **Workshop paper drafting** begins from the reframed problem statement.
 
 **Exit condition.** Workshop draft circulated internally for review by end of month.
@@ -82,8 +85,8 @@ Every gate has a go / iterate / re-scope decision. "Iterate" is not "more of the
 |---|---|---|
 | G-A | 2026-05-end | Is the graph load-bearing (MLP ablation fails)? |
 | G-B | 2026-06-end | Does any cross-topology transfer work at all? |
-| G-C | 2026-07-end | Is the workshop draft telling a coherent story? |
-| G-D | 2026-12-end | Is Theorem 1 non-vacuous on data? |
+| G-C | 2026-07-end | Does d_struct predict transfer gap with R² > 0.5 on at least one metric? Is the workshop draft coherent? |
+| G-D | 2026-12-end | Is Theorem 1 non-vacuous on data with the empirical L_Π? |
 | G-E | 2027-03-end | Is the main-conf draft at the quality bar? |
 | G-F | 2027-05 | Submit. |
 

@@ -6,6 +6,8 @@
 
 A learned graph policy for constrained sequential resource allocation on electrical distribution feeders. The empirical half of the pipeline works (code in `src/sg_resilience/`). The graph-learning half is underdeveloped: adjacency is symmetric and unweighted, there are no learned GNN baselines, and there is no topology generalization evaluation. That is why you are here.
 
+You were chosen because your expertise spans graph mining **and** graph learning — both are load-bearing here. Graph learning gives us the operator (C1) and the theory (C4); graph mining gives us the structural feeder atlas and the topology-similarity metric (C2+C6) that we believe will be the paper's signature result: *"we predict graph generalization from structure alone."*
+
 The target is NeurIPS. We will not rush a weak submission — we are aiming for workshop 2026, main 2027, and iterating until the paper is the best we can make it.
 
 ## 2. What exists today
@@ -36,10 +38,13 @@ The five contributions, in `02_research_goal.md`. Summary of ownership:
 | # | Contribution | You | Jia |
 |---|---|---|---|
 | C1 | Flow-aware message passing | **Design + implement** | Integrate + evaluate |
-| C2 | Topology-generalizing policy | **Design protocol + splits** | Run experiments |
+| C2 | Topology-generalizing policy + **structural atlas** | **Design protocol + splits + atlas** | Run experiments |
 | C3 | Differentiable feasibility projection | **Theory + reference impl** | Production impl |
 | C4 | CVaR-minimax + regret bound | **Lead** | Co-author |
 | C5 | GNN baseline zoo | Specify | **Implement + run** |
+| C6 | **Topology-similarity metric that predicts transfer** | **Lead** | Feeder engineering |
+
+C6 is the one contribution that is genuinely graph-mining-native and is where your dual background pays off the most. If d_struct works, it becomes the paper's headline.
 
 You also own the related-work chapter on GNNs, graph generalization, and safe graph learning. I own the resilience side.
 
@@ -53,14 +58,17 @@ You also own the related-work chapter on GNNs, graph generalization, and safe gr
 **Week 2.**
 - Implement C1 as a drop-in replacement for `GraphSAGEBlock`. Gate: pass the existing smoke metrics within a small tolerance.
 - Open "C2 topology-split proposal": which feeders go in `G_train`, which in `G_ood`, why.
+- Open "C6 atlas v0 proposal": which structural features go into the atlas, which graph-mining primitives are considered, why.
 
 **Week 3.**
 - C1 end-to-end result on at least case33bw and rural1.
 - First MLP and scrambled-edge ablations — we need to know by end of week 3 whether the graph is actually load-bearing.
+- `configs/feeder_atlas.yaml` v1 committed: every existing feeder catalogued with its structural fingerprint.
 
 **Week 4.**
 - First cross-topology result. This is the make-or-break moment. If transfer is uniformly catastrophic we go back and reframe before investing further.
-- Draft Theorem 1 (transfer bound) statement; proof can follow in weeks 5–6.
+- First d_struct v0 implementation; compute pairwise distances on the atlas and eyeball whether they track topology intuitions (rural/rural close, rural/LV-urban far).
+- Draft Theorem 1 (transfer bound) statement in d_struct form; proof can follow in weeks 5–6.
 
 Each milestone ends with a short written note in `notes/` and a decision in the weekly sync.
 

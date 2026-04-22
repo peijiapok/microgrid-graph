@@ -30,8 +30,26 @@ Any accepted split must satisfy:
 1. No feeder appears in both G_train and G_ood.
 2. At least one OOD feeder has |V| > max |V| in G_train (size-generalization).
 3. At least one OOD feeder has topology class different from every G_train feeder (structural-generalization).
+4. The split's structural distance d_struct(G_train-distribution, G_ood) is computed against the feeder atlas (C6) and reported. Splits that are trivially close (d_struct ≈ 0) are rejected because they cannot test transfer.
 
 Splits are versioned in `configs/topology_split_vN.yaml` and referenced by hash in every result artifact.
+
+### 1.5 Feeder atlas and topology-similarity metric
+
+Every split is computed against `configs/feeder_atlas.yaml`, an entity owned by the collaborator under C6. The atlas records, per feeder:
+
+- degree-distribution moments
+- spectral gap, algebraic connectivity
+- diameter, average path length, clustering coefficient
+- motif / graphlet counts up to k=4
+- community signature (number of communities, modularity, sizes)
+
+The topology-similarity metric d_struct is defined on these features (collaborator chooses the functional form; options include a weighted sum, a learned composite, or a Wasserstein-style distance on feature histograms). For every experimental split we report:
+
+- d_struct(G_train, G) for each G ∈ G_ood.
+- The empirical correlation between d_struct and observed transfer gap across all splits we run.
+
+This is the empirical backbone for Theorem 1 in `docs/06_theory_sketch.md`.
 
 ## 2. Metrics
 
@@ -46,6 +64,8 @@ Splits are versioned in `configs/topology_split_vN.yaml` and referenced by hash 
 - **`cvar_05[critical_continuity]`** = conditional value at risk at α=0.05 over held-out scenarios.
 - **`feasibility_violations`** = count of (budget / cap / outage) breaches. Must be 0.
 - **`wall_clock_per_step`** (CPU). Not a deployment target; a sanity check.
+- **`d_struct(G_train, G_test)`** — the topology-similarity metric from C6. Reported for every (train-dist, test-feeder) pair.
+- **`r2(d_struct, transfer_gap)`** — the empirical slope of transfer gap against structural distance, over all splits. Primary evidence for C6.
 
 ## 3. Baselines
 

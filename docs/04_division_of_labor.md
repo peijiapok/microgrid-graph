@@ -12,10 +12,11 @@
 | Contribution | Designer | Implementer | Reviewer | Writer (primary) |
 |---|---|---|---|---|
 | C1. Flow-aware MP | Collaborator | Collaborator | Jia | Collaborator |
-| C2. Topology-generalizing policy | Collaborator | Jia | Collaborator | Jia |
+| C2. Topology-generalizing policy + atlas | Collaborator | Collaborator (atlas) + Jia (splits harness) | Jia | Collaborator |
 | C3. Differentiable feasibility projection | Collaborator | Joint | Joint | Collaborator |
 | C4. CVaR-minimax + regret bound | Collaborator | Joint | Jia | Collaborator |
 | C5. GNN baseline zoo | Collaborator (specs) | Jia | Collaborator | Jia |
+| C6. Topology-similarity metric d_struct | Collaborator | Collaborator | Jia | Collaborator |
 
 ## 3. Cross-cutting work
 

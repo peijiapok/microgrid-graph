@@ -12,27 +12,31 @@
 - Loss ℓ(π, G, ξ) for scenario ξ drawn from scenario distribution S_G.
 - J(π; G) = 𝔼_{ξ ~ S_G}[ℓ(π, G, ξ)].
 - CVaR_α(Z) = 𝔼[Z | Z ≥ VaR_α(Z)].
-- d_WL(G, G'): k-WL-based graph distance (see Chen et al., "Can Graph Neural Networks Count Substructures?"-style formulations).
+- d_WL(G, G'): k-WL-based graph distance (see Chen et al., "Can Graph Neural Networks Count Substructures?"-style formulations). Used as a theoretical baseline; replaced in practice by d_struct below.
+- d_struct(G, G'): concrete, computable topology-similarity metric defined in C6 (`02_research_goal.md`) over the feeder atlas. Computed in seconds on every feeder in our setup.
 
 ## 2. Target Theorem 1 — Transfer bound
 
-**Statement (target).** Let π_θ ∈ Π_Θ be trained to minimize 𝔼_{G ~ D_train}[J(π_θ; G)]. Under the GNN-Lipschitz assumption
-‖π_θ(G) − π_θ(G')‖ ≤ L_Π · d_WL^{(k)}(G, G'),
+**Statement (target).** Let π_θ ∈ Π_Θ be trained to minimize 𝔼_{G ~ D_train}[J(π_θ; G)]. Let d_struct : 𝒢 × 𝒢 → ℝ₊ be the computable topology-similarity metric from C6, with per-feature definitions in `configs/feeder_atlas.yaml`. Under the GNN-Lipschitz assumption
+‖π_θ(G) − π_θ(G')‖ ≤ L_Π · d_struct(G, G'),
 and bounded loss ℓ ≤ B, with probability ≥ 1 − δ over the training sample of size N,
 
-  𝔼_{G ~ D_ood}[J(π_θ; G)] ≤ 𝔼_{G ~ D_train}[J(π_θ; G)] + L_Π · W_1(D_train, D_ood; d_WL^{(k)}) + B·√( log(1/δ) / (2N) ).
+  𝔼_{G ~ D_ood}[J(π_θ; G)] ≤ 𝔼_{G ~ D_train}[J(π_θ; G)] + L_Π · W_1(D_train, D_ood; d_struct) + B·√( log(1/δ) / (2N) ).
 
-**Reading.** The transfer gap is bounded by three interpretable terms: (i) training risk, (ii) topology-distribution shift measured in a GNN-aware metric, (iii) sample-size slack.
+**Reading.** The transfer gap is bounded by three interpretable terms: (i) training risk, (ii) topology-distribution shift measured in a *computable* structural metric, (iii) sample-size slack. The headline advantage over a d_WL formulation: every term can be numerically evaluated on our atlas, so the bound is not rhetorical.
 
 **Proof directions.**
 - Step 1: Rademacher-complexity bound for Π_Θ on the fixed-topology loss.
-- Step 2: Lipschitzness of π_θ w.r.t. d_WL via standard k-WL + GNN expressivity arguments.
-- Step 3: Kantorovich–Rubinstein duality to convert Lipschitz + distribution-shift into W_1.
+- Step 2: Lipschitzness of π_θ w.r.t. d_struct. Two paths: (a) bound L_Π directly by bounding the sensitivity of each message-passing layer to the atlas features; (b) learn L_Π empirically via finite differences across the atlas and verify the bound is tight.
+- Step 3: Kantorovich–Rubinstein duality to convert Lipschitz + distribution-shift into W_1(·; d_struct).
+- Step 4 (empirical backbone): regress observed transfer gap on d_struct across splits; the slope gives the *effective* L_Π used in the bound.
 
 **Known obstacles.**
-- The Lipschitz constant L_Π can be loose for deep GNNs. May need a layer-wise bound.
-- d_WL is hard to compute exactly for large graphs; we may have to use a tractable lower bound in practice.
+- The Lipschitz constant L_Π can be loose for deep GNNs. Mitigation above (empirical measurement) closes this.
+- d_struct is a vector feature reduced to a scalar — the functional form (weighted sum / learned combiner / Wasserstein-on-features) is a design choice; we report robustness to it.
 - The loss ℓ in our setting is *not* bounded uniformly when `unserved_critical_demand` is reported on large-P scenarios; either cap it or use a conditional bound.
+
+**Non-vacuity check (hard gate).** Plug the empirical L_Π, measured W_1(D_train, D_ood; d_struct), and N into the bound. The resulting number must be less than the trivial upper bound of 1 on critical continuity. If it is not, the bound is rhetorical and is reworked or cut. This check is a required test in `tests/theory/`.
 
 ## 3. Target Theorem 2 — Feasibility guarantee for the projection
 
