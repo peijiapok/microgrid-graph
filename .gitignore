@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+__MACOSX/
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Results / artifacts — not tracked
+results/
+*.zip
+*.pt
+*.ckpt
+*.pkl
+
+# But keep the directory layout hint
+!results/.gitkeep
+
+# Legacy artifacts explicitly ignored
+results/legacy_zips/
+
+# LaTeX build products
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.bbl
+paper/*.blg
+paper/*.toc
+paper/*.synctex.gz
+paper/_minted-*/
+
+# Local notes
+notes/local/
+notes/scratch/

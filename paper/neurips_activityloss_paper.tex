@@ -1,0 +1,239 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\title{Continuity-Aware Graph Control for Resilient Load Allocation in Distribution Grids}
+\author{Anonymous Authors \\
+NeurIPS Conference Submission Draft}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We study resilient load allocation in distribution grids under supply shortfalls and outages, where a controller must preserve critical service while respecting limited available power and avoiding unnecessary switching. We develop a compact graph-based controller that represents load nodes and network context with a GraphSAGE policy, then maps node scores to feasible allocations through sparsemax weighting and power-constrained projection. The training objective combines priority-weighted service, minimum-service floor penalties, critical-load penalties, switching regularization, imitation of a continuity-aware baseline, and two continuity-aligned terms that directly discourage critical-service drops and inactive critical loads. We evaluate the method against rule-based and optimization baselines on public pandapower and SimBench-style feeder benchmarks, and validate the resulting allocations with physics-based feasibility checks and stress sweeps. In regenerated runs, the previously collapsed LV-urban setting improves to weighted served energy 1.799338, unserved critical demand 0.009600, and critical continuity 0.968750. On case33bw, rural1, and rural2, the learned controller attains continuity 1.0 with aggregate unserved critical demand that rounds to 0 at reported precision. All completed regenerated runs converge in post hoc physics evaluation, and stress sweeps remain strong, especially on rural2 where continuity stays at 1.0 throughout and on rural1 where continuity is 1.0 except for one mild degradation case. These results show that continuity-aligned training substantially improves robustness and critical-load preservation in compact learning-based smart-grid controllers.
+\end{abstract}
+
+\section{Introduction}
+
+Distribution grids are increasingly expected to maintain service during supply shortfalls, outages, and rapidly changing stress conditions. In these settings, full demand satisfaction is often impossible, so the operational problem becomes one of selective service preservation: limited available power must be allocated to loads in a way that prioritizes critical demand, avoids unstable reconfiguration behavior, and remains operationally plausible. This is inherently a sequential decision problem because the cost of an allocation is not only the unmet demand at a single step, but also the continuity consequences of switching loads on and off over time.
+
+Rule-based and optimization-based controllers remain strong references for this problem. Priority heuristics are simple and interpretable, while optimization can explicitly encode continuity and minimum-service preferences. At the same time, learning-based controllers remain attractive because they offer the prospect of fast amortized decision-making across many scenarios. The main challenge is that naive learned policies can fail in precisely the regimes that matter most for resilience: they may remain budget-feasible while still starving critical loads or collapsing service continuity under stress.
+
+This paper presents a compact graph-based controller for resilient load allocation on public distribution-grid benchmarks. The controller uses GraphSAGE message passing over load-node features and produces feasible allocations through sparsemax-based prioritization followed by constrained projection. Our central contribution is a continuity-aware training objective that materially improves learned-policy behavior on difficult public benchmark settings. The key empirical result is not universal dominance over strong rule and optimization baselines on every metric. Rather, it is that a previously collapsed learned controller becomes a credible resilience-oriented policy: it recovers near-baseline continuity on the hardest completed LV-urban benchmark and achieves perfect aggregate critical continuity on three other completed public feeder settings.
+
+The paper makes three contributions. First, we formulate resilient load allocation as a graph-structured sequential resource-allocation problem with continuity-sensitive metrics. Second, we develop a compact GraphSAGE controller trained with a multi-term objective coupling weighted service, minimum-service floors, imitation, switching regularization, critical continuity-drop penalties, and critical activity penalties. Third, we provide auditable benchmark evidence on completed public feeder runs, including post hoc physics evaluation and stress sweeps, showing large gains in critical-load preservation over the prior collapsed learned setting.
+
+\section{Problem Setup}
+
+We consider a distribution-grid scenario consisting of a set of load nodes observed over a finite horizon. At each time step $t$, the controller receives a state containing the current demands, total available power, outage indicators, and topology-derived context. The controller must produce a nonnegative allocation vector $a_t$ satisfying a global budget constraint:
+\begin{equation}
+\sum_i a_{t,i} \le P_t,
+\end{equation}
+where $P_t$ is the available power at time $t$. Because demand can exceed available power, the controller must decide which loads to prioritize.
+
+Each node $i$ has a priority weight $w_i$, a criticality indicator, and a minimum-service target derived from a floor fraction. The problem is therefore not simply to maximize served energy, but to preserve critical demand over time while limiting avoidable switching. We evaluate policies using four metrics computed from rollouts: weighted served energy, unserved critical demand, switching count, and critical continuity ratio. Weighted served energy captures priority-aware service. Unserved critical demand directly measures shortfall on critical nodes. Switching count penalizes instability in active/inactive load status. Critical continuity ratio measures the fraction of critical-node time steps that remain active.
+
+\section{Method}
+
+\subsection{Compact graph controller}
+
+Our controller is a compact GraphSAGE policy operating on graph-structured load representations. Each node is featurized using normalized demand, normalized priority, a critical-load flag, previous allocation, supply-scale context, available-power ratio, demand-supply ratio, outage indicator, adaptive floor target, and static graph features. Let $x_i \in \mathbb{R}^{14}$ denote the resulting node feature vector. Given the feeder adjacency matrix $A$, the controller applies an input projection followed by multiple GraphSAGE blocks:
+\begin{equation}
+h_i^{(0)} = \phi(W_{\mathrm{in}} x_i),
+\end{equation}
+\begin{equation}
+h_i^{(\ell+1)} = \phi\left(W_{\mathrm{self}}^{(\ell)} h_i^{(\ell)} + W_{\mathrm{neigh}}^{(\ell)} \sum_{j} A_{ij} h_j^{(\ell)}\right),
+\end{equation}
+where $\phi$ denotes the ReLU--LayerNorm block used in the implementation. A final linear layer produces one scalar logit per node.
+
+These logits are converted to sparse nonnegative weights using sparsemax rather than softmax. Sparsemax is useful in this context because resilient allocation is often naturally sparse: under severe supply limits, only a subset of loads should receive service. The resulting weights are then passed to a projected allocation procedure that redistributes available power subject to node demand caps and the total available-power budget. This final step ensures feasible allocations by construction.
+
+\subsection{Continuity-aware objective}
+
+The learning objective is designed to align with resilience rather than only aggregate utility. For each time step, the model first computes adaptive floor targets. It then evaluates a multi-term loss built from the following components:
+
+\begin{itemize}[leftmargin=1.5em]
+  \item a priority-weighted service term that rewards surplus above floor targets;
+  \item a floor shortfall penalty that discourages falling below minimum-service levels;
+  \item a critical shortfall penalty that increases the cost of under-serving critical nodes;
+  \item a critical activity penalty that discourages zero or near-zero service on critical loads;
+  \item a switching penalty that discourages large changes across adjacent time steps;
+  \item a critical continuity-drop penalty that explicitly discourages service losses on critical loads once active;
+  \item a SmoothL1 imitation loss against a continuity-aware teacher baseline.
+\end{itemize}
+
+At a high level, the per-step loss can be written as
+\begin{equation}
+\mathcal{L}_t = \mathcal{L}_{\mathrm{service}} + \mathcal{L}_{\mathrm{floor}} + \mathcal{L}_{\mathrm{critical}} + \mathcal{L}_{\mathrm{activity}} + \mathcal{L}_{\mathrm{switch}} + \mathcal{L}_{\mathrm{drop}} + \mathcal{L}_{\mathrm{imit}},
+\end{equation}
+with scenario-level weighting used to upweight harder stress families such as supply collapse, outage persistence, and overload. In the current regenerated runs, the main scalar weights are a switching penalty of 0.2, a critical penalty of 2.0, a floor penalty of 20.0, and an imitation weight of 0.5. In addition, teacher targets are refreshed per epoch using the current switching penalty schedule, which keeps imitation aligned with the evolving optimization objective.
+
+\subsection{Worst-case-aware model selection}
+
+Checkpoint selection is based not only on mean evaluation behavior but also on worst-case resilience outcomes. The model-selection key is lexicographic: it first minimizes mean unserved critical demand, then worst-case unserved critical demand, then maximizes mean and worst-case critical continuity, then maximizes mean weighted served energy, and finally minimizes mean switching count. This discourages selecting models that look good on average while hiding collapse in tail scenarios.
+
+\section{Experimental Setup}
+
+\subsection{Benchmarks and baselines}
+
+We evaluate on four completed public feeder settings: pandapower case33bw and three SimBench-style feeders (LV urban, rural1, and rural2). A larger MVLV urban benchmark was attempted multiple times but did not finish within the current wall-clock budget, so it is excluded from completed benchmark claims.
+
+The learned controller is compared against two internal baselines. The first is a rule-based priority allocator. The second is an optimization-based continuity-aware baseline used both as a stronger reference and as the teacher for imitation. The paper therefore studies learned control in relation to two practically meaningful alternatives rather than in isolation.
+
+\subsection{Evaluation pipeline}
+
+For each completed benchmark run, we report aggregate comparison metrics, post hoc physics evaluation, and stress sweeps. Aggregate comparisons quantify nominal behavior on held-out scenarios. Physics evaluation checks whether the resulting allocations converge under the network simulator. Stress sweeps test the controller under supply-collapse, outage-persistence, and overload families. The regenerated benchmark runs reported here all use the updated continuity-aware training objective.
+
+\section{Results}
+
+\subsection{Main benchmark comparison}
+
+Table~\ref{tab:main-results} summarizes the completed regenerated benchmark results. The learned controller does not dominate the rule and optimization baselines on every metric. However, it materially improves the prior learned-policy failure mode and achieves strong continuity behavior on all completed feeders.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Aggregate comparison metrics on completed regenerated benchmark runs. Lower unserved critical demand is better; higher continuity is better.}
+\label{tab:main-results}
+\begin{tabular}{llrrrr}
+\toprule
+Benchmark & Baseline & Weighted Served & Unserved Critical & Switching & Continuity \\
+\midrule
+\multirow{3}{*}{LV urban}
+& Rule & 2.164550 & 0.000000 & 20 & 1.000000 \\
+& Optimization & 2.133488 & 0.000000 & 96 & 1.000000 \\
+& Learned & 1.799338 & 0.009600 & 79 & 0.968750 \\
+\midrule
+\multirow{3}{*}{case33bw}
+& Rule & 93.972002 & 0.000000 & 0 & 1.000000 \\
+& Optimization & 93.969240 & 0.000000 & 0 & 1.000000 \\
+& Learned & 81.297321 & 0.000000 & 0 & 1.000000 \\
+\midrule
+\multirow{3}{*}{rural1}
+& Rule & 1.745571 & 0.000000 & 2 & 1.000000 \\
+& Optimization & 1.743448 & 0.000000 & 2 & 1.000000 \\
+& Learned & 1.568336 & 0.000000 & 2 & 1.000000 \\
+\midrule
+\multirow{3}{*}{rural2}
+& Rule & 1.065928 & 0.000000 & 87 & 1.000000 \\
+& Optimization & 1.008681 & 0.000000 & 111 & 1.000000 \\
+& Learned & 0.679320 & 0.000000 & 33 & 1.000000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The most important finding is the LV-urban recovery. Before the continuity-aware training revision, the learned smoke behavior had effectively collapsed, producing weighted served energy 0.136110, unserved critical demand 0.110600, and critical continuity 0.0. After regeneration with the revised objective, the learned controller achieves weighted served energy 1.799338, unserved critical demand 0.009600, and continuity 0.968750. This is a substantial qualitative change: the learned controller is no longer near-degenerate on the hardest completed feeder.
+
+On case33bw, rural1, and rural2, the learned controller attains continuity 1.0 with aggregate unserved critical demand that rounds to 0 at reported precision. These results do not imply universal superiority over the baselines. In several settings, the rule and optimization baselines retain higher weighted served energy. The stronger and more defensible conclusion is that continuity-aware training makes a compact learned controller viable for resilience-sensitive operation across multiple public feeders.
+
+\subsection{Physics evaluation}
+
+All completed regenerated runs converge in post hoc physics evaluation. This means that the learned controller's allocations, when rolled out on the completed benchmark scenarios, remain compatible with convergent network simulation. Table~\ref{tab:physics-summary} summarizes the convergence outcome.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Physics evaluation summary for completed regenerated runs.}
+\label{tab:physics-summary}
+\begin{tabular}{lr}
+\toprule
+Benchmark & Learned Converged Ratio \\
+\midrule
+LV urban & 1.0 \\
+case33bw & 1.0 \\
+rural1 & 1.0 \\
+rural2 & 1.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+It is important to state this result carefully. The training objective does not include an in-loop power-flow solver, so the method should not be described as physics-constrained learning. Instead, the correct interpretation is that the learned policy passes a post hoc feasibility audit on all completed regenerated runs.
+
+\subsection{Stress behavior}
+
+Stress sweeps reveal where the training update helps most. Rural1 and rural2 remain particularly strong: the learned controller maintains continuity 1.0 throughout the listed stress scenarios, with only one mild rural1 degradation to 0.96875 in a supply-collapse case. Case33bw also remains at continuity 1.0 throughout its stress sweep.
+
+LV urban remains the hardest completed setting. Here the learned controller's stress continuity is mostly in the 0.875--1.0 range rather than uniformly perfect. This matters because it prevents overclaiming. The revised objective substantially improves resilience behavior and eliminates the earlier collapse pattern, but it does not fully erase the difficulty of the urban feeder under all overload and persistent-outage conditions.
+
+\section{Discussion}
+
+The results suggest that the main failure mode of the earlier learned controller was not lack of graph representation, but loss misalignment. A compact graph policy can remain allocation-feasible while still behaving poorly from a resilience perspective if continuity and critical activity are not explicitly optimized. The revised objective addresses this by connecting the learning signal directly to the operational metric contract: preserve critical service, reduce harmful drops, and avoid unnecessary switching.
+
+From an ML perspective, this study highlights the importance of worst-case-aware training and selection in sequential resource-allocation problems. Average-case service objectives can conceal tail collapse. In contrast, continuity-aware penalties and worst-case-aware model selection shift learning toward the failure modes that operators actually care about. The strongest evidence for this is the LV-urban benchmark, where the learned policy transitions from collapse-like behavior to near-baseline continuity after the objective revision.
+
+At the same time, the learned controller should not be framed as a universal replacement for rule or optimization baselines. The classical methods remain highly competitive and sometimes better on weighted served energy. The defensible claim is narrower and more useful: continuity-aware training turns compact learned control from an unreliable option into a credible resilience-oriented alternative on completed public benchmarks.
+
+\section{Limitations}
+
+The current paper has several limitations. First, the completed benchmark set is still limited. We report four completed regenerated runs, but the larger MVLV urban benchmark remains unfinished because it exceeded the available wall-clock budget in repeated attempts. This should be treated as an environment limitation, not silently folded into the completed evidence.
+
+Second, the physics checks are post hoc rather than integrated into the learning objective. The method therefore demonstrates empirical feasibility on completed runs, not formal physical guarantees during training. Third, while the current results are strong on continuity and critical-load preservation, the manuscript does not include the broader ablation suite that NeurIPS reviewers may expect, such as systematic variation of architecture depth, hidden size, or loss-term removal. Finally, the paper currently avoids external citations rather than inventing unsupported related-work claims; a submission-ready version should add a proper bibliography grounded in real literature.
+
+\section{Broader Impact}
+
+Learning-based resilient control could support high-priority service preservation during adverse grid events, including service for hospitals, communication nodes, and other critical infrastructure. More broadly, the continuity-aware sequential-allocation formulation may be useful in disaster logistics and other public-service settings where scarce resources must be allocated under time-varying stress.
+
+However, deploying learned control in critical infrastructure carries significant risk. Policies can fail out of distribution, and nominal average-case success can hide brittle tail behavior. For this reason, the appropriate near-term use of methods like ours is as decision support or as a candidate controller evaluated alongside interpretable and optimization-based references, rather than as an unquestioned replacement. Transparent reporting of incomplete benchmarks and explicit stress auditing are therefore part of the contribution rather than afterthoughts.
+
+\section{Conclusion}
+
+We presented a compact GraphSAGE-based controller for resilient load allocation in distribution grids and showed that continuity-aware training substantially improves learned-policy behavior on public feeder benchmarks. The revised objective couples weighted service, floor preservation, imitation, switching regularization, critical continuity-drop penalties, and critical activity penalties. Across completed regenerated runs, the learned controller improves the difficult LV-urban case from prior collapse-like behavior to near-baseline continuity, while attaining continuity 1.0 with zero aggregate unserved critical demand on case33bw, rural1, and rural2. All completed regenerated runs pass post hoc physics convergence checks, and stress sweeps remain strong, especially on rural feeders.
+
+The most important conclusion is not that learned control universally dominates classical baselines. It is that compact graph controllers become viable for resilience-sensitive sequential allocation once the training objective is aligned with continuity and critical-load preservation. The next empirical step is to extend the same evaluation protocol to the unfinished MVLV urban benchmark under higher-budget compute and then broaden the ablation story for a full conference submission.
+
+\section*{Reproducibility Statement}
+
+This draft is grounded in the current verified repository state and completed regenerated benchmark artifacts. The main supporting files are the implementation under \texttt{src/sg\_resilience/}, the summary report \texttt{results/activityloss\_regeneration\_summary.md}, and the completed benchmark result directories ending in \texttt{\_activityloss}.
+
+\section*{Acknowledgments}
+
+This manuscript draft reflects only completed, auditable results currently present in the repository.
+
+\appendix
+
+\section{Repository-Grounded Experimental Evidence}
+
+The completed benchmark runs used for this draft are stored in:
+\begin{itemize}[leftmargin=1.5em]
+  \item \texttt{results/simbench\_lv\_urban\_fair\_run\_activityloss}
+  \item \texttt{results/case33bw\_fair\_run\_activityloss}
+  \item \texttt{results/simbench\_rural1\_fair\_run\_activityloss}
+  \item \texttt{results/simbench\_rural2\_fair\_run\_activityloss}
+\end{itemize}
+
+The consolidated summary file is:
+\begin{center}
+\texttt{results/activityloss\_regeneration\_summary.md}
+\end{center}
+
+The unfinished large benchmark excluded from completed claims is:
+\begin{center}
+\texttt{configs/simbench\_urban\_benchmark.yaml}
+\end{center}
+
+\section{Submission-Ready Extensions}
+
+The current conference draft can be strengthened further by adding a bibliography to situate the method relative to prior graph-control and resilient-allocation work, by incorporating figure assets and captions, by expanding the ablation story around objective terms and model size, and by completing the large MVLV urban benchmark if additional compute becomes available.
+
+\end{document}
