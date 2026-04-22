@@ -4,7 +4,9 @@
 
 ## 1. What this project is, in 30 seconds
 
-A learned graph policy for constrained sequential resource allocation on electrical distribution feeders. The empirical half of the pipeline works (code in `src/sg_resilience/`). The graph-learning half is underdeveloped: adjacency is symmetric and unweighted, there are no learned GNN baselines, and there is no topology generalization evaluation. That is why you are here.
+**Real-world setting:** catastrophic grid events — hurricanes, wildfires, cascading outages, extreme-heat overloads — where supply collapses below demand and a controller must allocate scarce power so critical infrastructure (hospitals, data centers, communications) stays on. Operators have no time to retrain on the specific feeder that just failed.
+
+**ML setting:** a learned graph policy for constrained sequential resource allocation on electrical distribution feeders, evaluated zero-shot on feeder topologies never seen during training. The empirical half of the pipeline works (code in `src/sg_resilience/`). The graph-learning half is underdeveloped: adjacency is symmetric and unweighted, there are no learned GNN baselines, and there is no topology generalization evaluation. That is why you are here.
 
 You were chosen because your expertise spans graph mining **and** graph learning — both are load-bearing here. Graph learning gives us the operator (C1) and the theory (C4); graph mining gives us the structural feeder atlas and the topology-similarity metric (C2+C6) that we believe will be the paper's signature result: *"we predict graph generalization from structure alone."*
 

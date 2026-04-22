@@ -1,10 +1,10 @@
 # microgrid-graph
 
-A research codebase for **topology-generalizing graph control of constrained sequential resource allocation**, instantiated on electrical distribution-feeder resilience. Targeted at NeurIPS.
+**Topology-generalizing graph control for catastrophic grid events**, instantiated on electrical distribution feeders. Targeted at NeurIPS.
 
 ## One-paragraph pitch
 
-A learned graph policy allocates a scarce power budget across feeder loads at each time step, preserving critical service under stress. The ML question is not "how do we allocate well?" — priority heuristics and classical optimization already do that. The ML question is: *can one graph-structured policy, trained on a family of feeder topologies with a physics-aware operator and a distributionally-robust objective, generalize zero-shot to unseen topologies — and can we bound the worst-case continuity gap?* The answer and the theory around it are the paper.
+When a distribution grid is hit by a catastrophic event — a hurricane, a wildfire, a cascading outage, an extreme-heat overload — supply collapses below demand and a controller must allocate the scarce power that remains so critical infrastructure (hospitals, data centers, communications, cold-chain pharmacy) stays on. The easy version of this problem — "allocate well on a feeder you have trained on" — is already handled by priority heuristics and classical optimization. The hard version, and the one this project addresses, is acting on **feeders the controller has never seen**, with formal guarantees. During a real crisis you cannot retrain a model on the specific feeder that just failed; either the policy generalizes zero-shot across topologies, or it is useless when it matters. We build (i) a graph-structured policy that generalizes zero-shot across feeder topologies, (ii) a graph-mining-native structural-similarity metric that predicts how well it will transfer before you train, and (iii) a bound on the worst-case continuity gap in terms of GNN expressivity, structural coverage, and adversary budget. The combined story is the paper.
 
 ## Status
 

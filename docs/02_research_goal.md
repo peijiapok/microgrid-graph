@@ -4,7 +4,11 @@
 
 ## 1. One-sentence pitch
 
-A physics-aware graph policy, trained on a family of distribution-grid topologies with a CVaR-minimax objective and a differentiable feasibility projection, generalizes zero-shot to unseen topologies, and the worst-case continuity gap is bounded by a term capturing GNN expressivity, training-topology coverage, and adversarial budget.
+When a distribution grid is in crisis, a physics-aware graph policy — trained on a family of feeder topologies with a CVaR-minimax objective and a differentiable feasibility projection — must generalize zero-shot to unseen topologies and keep critical infrastructure online; we provide such a policy, a graph-mining-native structural-similarity metric that predicts how well it will transfer *before training*, and a bound on the worst-case continuity gap in terms of GNN expressivity, structural coverage, and adversary budget.
+
+## 1a. Why this matters
+
+Catastrophic events — weather disasters, cascading outages, coordinated strikes on infrastructure, extreme-heat overloads — are when grid control becomes both high-stakes and hardest. Supply collapses, playbooks break, and the feeders that matter may not be the ones the operator has trained a model on. A controller worth trusting in those conditions must therefore work on graphs it has never seen, and we must be able to predict how well it will work before we deploy it. Existing learned controllers neither evaluate this nor bound it. This paper does both.
 
 ## 2. The five contributions
 

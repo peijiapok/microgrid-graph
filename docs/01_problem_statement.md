@@ -4,13 +4,19 @@
 
 ## 1. Informal statement
 
-We study **constrained sequential resource allocation on physical graphs under topology shift**. Concretely: one learned graph-structured policy must decide, at each time step and for each node of an electrical distribution feeder, how much of a scarce power budget to route there — respecting hard budget, non-negativity, and demand caps; preserving continuity of service to critical nodes; and doing so on feeder topologies **never seen during training**.
+### The real-world setting: catastrophic grid events
 
-The ML kernel is *not* "resilient load allocation". The ML kernel is:
+When a distribution grid experiences a catastrophic event — a hurricane severs a feeder, a wildfire forces generation offline, a coordinated outage takes out substations, an extreme-heat day drives demand past supply — there is no longer enough power to serve every load. A controller must decide, step by step, how to allocate the scarce power that remains: hospitals and data centers stay on, lower-priority loads are shed, and the decisions must not flip loads on and off erratically. This is not an academic problem. Operators make this decision under pressure, on feeders whose exact topology their playbooks never anticipated, and the cost of getting it wrong is measured in critical-infrastructure downtime — not in regret.
+
+### The ML setting: topology-generalizing constrained allocation on graphs
+
+We formalize the catastrophic-grid problem as an ML problem. Concretely: one learned graph-structured policy must decide, at each time step and for each node of an electrical distribution feeder, how much of a scarce power budget to route there — respecting hard budget, non-negativity, and demand caps; preserving continuity of service to critical nodes; and doing so on feeder topologies **never seen during training**. That last requirement is the hinge of the whole project. During a real crisis no one has time to retrain a model on the specific feeder that just failed; either the policy generalizes zero-shot across topologies with formal guarantees, or it is useless when it matters.
+
+The ML kernel is *not* "resilient load allocation" in the generic sense. The ML kernel is:
 
 > *Can a graph policy trained on topology family **G**ᵗʳᵃⁱⁿ produce zero-shot feasible, constraint-respecting, continuity-preserving decisions on an unseen topology family **G**ᵒᵒᵈ — and can we bound the worst-case continuity gap as a function of (GNN expressivity) + (topology coverage) + (adversary budget)?*
 
-Grid resilience is the instance. Topology-generalizing graph control is the paper.
+Catastrophic grid events are the high-stakes setting that makes this the right question. Topology-generalizing graph control under hard constraints is the paper.
 
 ## 2. Formal setup
 
