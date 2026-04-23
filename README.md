@@ -28,9 +28,14 @@ microgrid-graph/
 
 ## How to read this repo
 
+For an external reader (advisor, funding committee, new reviewer):
+1. `PROPOSAL.md` — the formal research proposal (standalone, ~5 pages).
+2. `PROGRESS.md` — current state, commits, gates, risks.
+
+For someone working on the project:
 1. `docs/01_problem_statement.md` — the formal problem.
-2. `docs/02_research_goal.md` — the five contributions and what we will and will not claim.
-3. `docs/03_collaborator_brief.md` — onboarding for the graph-learning collaborator.
+2. `docs/02_research_goal.md` — the six contributions and what we will and will not claim.
+3. `docs/03_collaborator_brief.md` — onboarding for the collaborator.
 4. `docs/05_experimental_protocol.md` — how we test the claims.
 5. The rest of `docs/` — theory sketch, related work, timeline, reproducibility.
 
