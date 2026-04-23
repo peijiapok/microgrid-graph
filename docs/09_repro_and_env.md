@@ -20,29 +20,48 @@ cd /path/to/microgrid-graph
 python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
-pip install torch pandapower simbench numpy pyyaml pytest
-pip install -e src/
+pip install -e .
+# Optional extras:
+pip install -e ".[simbench]"   # for SimBench feeder loaders
+pip install -e ".[dev]"        # for pytest, ruff, mypy
 ```
 
-The editable install makes `sg_resilience` importable and matches what the `neurips_activityloss_paper.tex` assumes.
+The editable install uses the `pyproject.toml` at the repo root (src-layout). After install, `import sg_resilience` works from any directory.
 
 ## 3. Smoke test (target: <10 minutes on CPU)
 
-A smoke script does not yet exist — it is the first infrastructure deliverable. Target contract:
+Run:
 
 ```
 python -m sg_resilience.smoke
 ```
 
-Runs:
-1. Load case33bw benchmark (already supported in `benchmark_loader.py`).
-2. Generate a tiny scenario set (5 scenarios, 4 time steps).
-3. Train the current GraphSAGE controller for 10 epochs, CPU.
-4. Evaluate and print the four core metrics.
-5. Assert feasibility: budget, demand cap, non-negativity all satisfied.
-6. Exit code 0 on success.
+It does:
+1. Loads case33bw via `configs/smoke_case33bw.yaml` through `benchmark_loader.py`.
+2. Generates 5 scenarios (3 persistent stress variants + 2 random) over 4 time steps.
+3. Trains the compact GraphSAGE controller for 10 epochs on CPU, `hidden_dim=16`, `num_layers=2`.
+4. Evaluates on the base scenario and prints the four core metrics.
+5. Asserts feasibility exactly: `0 ≤ a_i ≤ d_i` per node and `sum(a) ≤ P` per step.
+6. Exits 0 on success, non-zero with a clear diagnostic on failure.
 
-If the smoke test fails for a new contributor, something is broken at a load-bearing level — not an edge case.
+Representative local run (case33bw, CPU, a few seconds):
+
+```
+[smoke] scenario=case33bw_public_benchmark nodes=32 steps=4
+[smoke] train_scenarios=5 eval_scenarios=1
+[smoke] training compact controller (10 epochs, CPU, tiny)
+[smoke] final_loss=-4.43
+[smoke] evaluating + asserting feasibility
+[smoke]   case33bw_public_benchmark
+[smoke]     weighted_served_energy: 97.63
+[smoke]     unserved_critical_demand: 1.2e-07
+[smoke]     switching_count: 0
+[smoke]     critical_continuity_ratio: 1.0
+[smoke]   feasibility OK (4 steps)
+[smoke] PASS
+```
+
+If the smoke fails for a new contributor, something is broken at a load-bearing level — not an edge case.
 
 ## 4. Where artifacts live
 

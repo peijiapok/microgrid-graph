@@ -1,0 +1,113 @@
+# Feeder Atlas v0 — skeleton.
+#
+# Owner: Collaborator (C6, see docs/02_research_goal.md).
+#
+# This file is the structural fingerprint registry. Each feeder listed
+# here gets filled with graph-mining-native features. The topology-
+# similarity metric d_struct (C6) is defined over these features. Every
+# topology split (see configs/topology_split_*.yaml) is justified by
+# structural distance computed against this atlas.
+#
+# Required features per feeder (fill during week 3, per docs/03 §5):
+#
+#   degree_distribution:
+#     mean, std, max, p95
+#
+#   spectral:
+#     algebraic_connectivity      # Fiedler value of the Laplacian
+#     spectral_gap                # λ2 - λ1 of the normalized Laplacian
+#     first_three_eigvals         # leading eigvals of the Laplacian
+#
+#   shape:
+#     diameter
+#     avg_path_length
+#     clustering_coefficient
+#
+#   motifs:
+#     # normalized counts; use networkx or orca / pgd for graphlets up to k=4
+#     triangle_count_normalized
+#     four_cycle_count_normalized
+#     four_path_count_normalized
+#     four_star_count_normalized
+#
+#   community:
+#     num_communities             # via Louvain or Leiden
+#     modularity
+#     community_size_entropy      # Shannon entropy of normalized community sizes
+#
+# HARD CONSTRAINT (C6 done-when §1): every feature above must be computable
+# in under 1 second per feeder, on CPU. Use approximations if exact counts
+# are too slow.
+
+version: 0
+frozen_at: null
+owner: collaborator
+
+feeders:
+  case33bw:
+    source: pandapower
+    approx_n_loads: 32
+    degree_distribution: null
+    spectral: null
+    shape: null
+    motifs: null
+    community: null
+
+  simbench_rural1:
+    source: simbench
+    approx_n_loads: 40
+    degree_distribution: null
+    spectral: null
+    shape: null
+    motifs: null
+    community: null
+
+  simbench_rural2:
+    source: simbench
+    approx_n_loads: 60
+    degree_distribution: null
+    spectral: null
+    shape: null
+    motifs: null
+    community: null
+
+  simbench_lv_urban:
+    source: simbench
+    approx_n_loads: 100
+    degree_distribution: null
+    spectral: null
+    shape: null
+    motifs: null
+    community: null
+
+  ieee_34:
+    source: pandapower
+    approx_n_loads: 34
+    degree_distribution: null
+    spectral: null
+    shape: null
+    motifs: null
+    community: null
+
+  ieee_123:
+    source: pandapower
+    approx_n_loads: 123
+    degree_distribution: null
+    spectral: null
+    shape: null
+    motifs: null
+    community: null
+
+# The topology-similarity metric itself.
+# Choose one functional form in the week-3 PR; alternatives listed here
+# so reviewers can see the design space considered.
+d_struct:
+  version: 0
+  selected_functional_form: null    # one of: weighted_l2 | wasserstein_histogram | learned_mlp
+  candidates:
+    - weighted_l2:
+        note: "Simplest. Per-feature weights are hyperparameters tuned to maximize R^2 with transfer gap."
+    - wasserstein_histogram:
+        note: "Treat degree distribution and motif counts as histograms; use 1-Wasserstein."
+    - learned_mlp:
+        note: "MLP over the concatenated feature vector, trained to regress observed transfer gap."

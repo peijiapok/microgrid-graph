@@ -1,0 +1,67 @@
+# Topology Split v1 — first frozen split for evaluating zero-shot
+# topology generalization (contribution C2, see docs/02_research_goal.md).
+#
+# Invariants (see docs/05_experimental_protocol.md §1):
+#   1. No feeder appears in both G_train and G_ood.
+#   2. At least one OOD feeder has |V| > max |V| in G_train (size-gen).
+#   3. At least one OOD feeder has topology class unseen in G_train.
+#   4. d_struct(G_train-distribution, G_ood) computed and reported per feeder
+#      once configs/feeder_atlas.yaml (C6) is populated.
+#
+# Status: proposed, not yet validated by tests/. See Issue #3.
+
+version: 1
+frozen_at: 2026-04-23
+invariants_satisfied: [size_gen, class_gen]  # (4) pending atlas
+
+G_train:
+  - id: case33bw
+    source: pandapower
+    approx_n_loads: 32
+    class: radial_small
+    loader: load_public_benchmark_scenario
+    note: "Standard pandapower benchmark feeder."
+
+  - id: simbench_rural1
+    source: simbench
+    approx_n_loads: 40
+    class: rural_lv
+    loader: load_public_benchmark_scenario
+    note: "SimBench LV rural variant 1."
+
+  - id: simbench_rural2
+    source: simbench
+    approx_n_loads: 60
+    class: rural_lv
+    loader: load_public_benchmark_scenario
+    note: "SimBench LV rural variant 2."
+
+G_ood:
+  - id: simbench_lv_urban
+    source: simbench
+    approx_n_loads: 100
+    class: urban_lv
+    loader: load_public_benchmark_scenario
+    satisfies: [class_gen, size_gen]
+    note: "Denser urban LV; distinct class from all G_train."
+
+  - id: ieee_34
+    source: pandapower
+    approx_n_loads: 34
+    class: radial_medium
+    loader: load_public_benchmark_scenario
+    satisfies: [class_gen]
+    note: "Classic IEEE 34-bus test feeder. TODO confirm pandapower loader name."
+
+  - id: ieee_123
+    source: pandapower            # may require OpenDSS converter — verify at load
+    approx_n_loads: 123
+    class: radial_large
+    loader: load_public_benchmark_scenario
+    satisfies: [size_gen, class_gen]
+    note: "Largest OOD feeder; tests size-gen hardest. Fallback if loader unavailable: drop from v1 and add synthetic radial of similar size."
+
+# To be populated by C6 once `configs/feeder_atlas.yaml` is filled.
+d_struct_report:
+  atlas_version: null
+  pairwise_distances: {}

@@ -1,0 +1,18 @@
+# Smoke benchmark — case33bw, short horizon, deliberately easy.
+# Consumed by `python -m sg_resilience.smoke`.
+# Contract: end-to-end pipeline must finish in <10 minutes on CPU and
+# assert feasibility exactly. See docs/09_repro_and_env.md §3.
+
+benchmark:
+  source: pandapower
+  name: case33bw
+  horizon: 4
+  demand_profile: [1.00, 0.95, 1.05, 1.00]
+  supply_ratio: 0.75                      # moderate stress (25% shortfall)
+  default_min_service_fraction: 0.2
+  critical_min_service_fraction: 0.55
+  critical_top_k: 6
+
+metadata:
+  purpose: smoke_test
+  note: "Fixtures for onboarding and CI. Not a paper result."
