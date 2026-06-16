@@ -2,7 +2,32 @@
 
 > RESOLVED into a conditional result (stronger than pure negative). Pilot + decision-room diagnostics + congestion sweep + B-viability test (GPT-5.5-guided).
 
-## RESOLUTION (read first)
+## FINAL VERDICT (2026-06-17, sparse topology + wrong-graph control) — read first
+The wrong-graph control overturns the earlier optimistic read. With the **real
+sparse feeder topology** and LP-optimal training:
+
+| cap_scale | no-graph | real-graph | wrong-graph | real−nograph | real−wrong |
+|---|---|---|---|---|---|
+| 1.0 (realistic) | 0.979 | 0.990 | — | +0.011 | — |
+| 0.03 (crisis) | 0.886 | 0.977 | 0.975 | **+0.091** | **+0.002** |
+
+**A degree-preserving WRONG graph does as well as the real one (+0.002).** So the
+congestion benefit comes from a **generic relational/message-passing inductive
+bias, NOT from the actual feeder topology.** The strong claims —
+"topology-generalizing graph control" (C2) and "structural distance predicts
+transfer" (C6) — are **NOT supported**: real feeder structure is not load-bearing,
+even under crisis congestion. Topology-blind control (DeepSets) is near-optimal
+and more OOD-robust on realistic feeders.
+
+**This is the honest, rigorous result of the project:** a negative result with
+clean no-graph AND wrong-graph controls. It is publishable as a cautionary
+ML-for-power finding, but it guts the original graph-necessity thesis (C1/C2/C6
+lose their load-bearing role). **Lead decision needed** — see updated options
+below; the strongest honest paper is the negative result; a positive graph paper
+would require a genuinely topology-coupled DECISION (network reconfiguration /
+AC feasibility), i.e. a different problem.
+
+## RESOLUTION (read first) [SUPERSEDED by FINAL VERDICT above — the +0.092 was generic message-passing, not real topology]
 Graph-necessity is **conditional on flow constraints binding**:
 - **Realistic feeders (capacity headroom):** decision-room ≈ 0; priority-greedy is optimal; the learned graph policy ties or *underperforms* no-graph (overfits). Topology-blind control suffices and is more OOD-robust.
 - **Congested/crisis regime (cap_scale≈0.03) + training against the LP-OPTIMAL set-selection:** GraphSAGE OOD C **0.982 vs DeepSets 0.898 (+0.084)** — graph is genuinely load-bearing.
