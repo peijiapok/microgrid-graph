@@ -9,6 +9,14 @@ Graph-necessity is **conditional on flow constraints binding**:
 
 **Crucial:** the congested regime where topology matters is exactly the **catastrophe / scarce-power regime that motivates this project** (docs/01–02). So this is not unrealistic engineering — it is the crisis the paper is about. Both conditions (congestion AND optimal-target training) are necessary; neither alone gives a graph benefit.
 
+**CONFIRMED central curve** (LP-optimal training, 3 model seeds, `scripts/h1_conditional_sweep.py`):
+| cap_scale | graph−nograph OOD C |
+|---|---|
+| 1.0 (realistic) | +0.009 ± 0.003 (≈0) |
+| 0.06 | +0.024 ± 0.030 |
+| 0.03 (crisis) | **+0.092 ± 0.005** (all seeds 0.084–0.097) |
+Monotonic in congestion, tight at the congested end — the conditional graph-necessity claim holds with multi-seed error bars.
+
 **Recommended paper claim:** "Topology is load-bearing for continuity control precisely in the flow-constrained crisis regime; under normal headroom, topology-blind control suffices and transfers better. Capturing the graph benefit requires optimal-target training, not greedy imitation. We characterize the decision-room→congestion relationship that governs when graph structure helps." (Caveat: +0.084 is a single modest-seed run — confirm with a multi-seed cap-scale sweep before claim-bearing.)
 
 ---
