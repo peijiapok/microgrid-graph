@@ -27,6 +27,14 @@ below; the strongest honest paper is the negative result; a positive graph paper
 would require a genuinely topology-coupled DECISION (network reconfiguration /
 AC feasibility), i.e. a different problem.
 
+### GPT-5.5 sign-off + hardening checklist (to make the negative result claim-bearing)
+GPT-5.5 confirms the conclusion (phrase narrowly: *in this architecture/objective, once feasibility is a shared topology-aware allocator, feeder topology is not load-bearing for the learned policy*). Recommended paper: **(a) rigorous negative result** > (b) pivot decision to topological (reconfiguration/AC = new paper) > (c) drop graphs. Headline: *"shared topology-aware allocators can make graph policies look useful while the actual feeder graph is non-causal for the learned decision."* Confounds to close before final claim:
+1. Harsher wrong-graph controls: random tree, star/path, kNN-on-features, shuffled-adjacency-per-episode (not only degree-preserving rewire).
+2. State allocator leakage explicitly (topology enters as the constraint module; the point, not a flaw).
+3. Report **headroom-to-oracle**, not just raw C (cap 1.0 is saturated; cap 0.03 is the diagnostic).
+4. Check whether LP-target selection is feature-only predictable (feature-only predictor vs oracle; do selected nodes cluster topologically?).
+5. Multi-seed CIs for real−wrong: the claim needs "indistinguishable," not just close point estimates.
+
 ## RESOLUTION (read first) [SUPERSEDED by FINAL VERDICT above — the +0.092 was generic message-passing, not real topology]
 Graph-necessity is **conditional on flow constraints binding**:
 - **Realistic feeders (capacity headroom):** decision-room ≈ 0; priority-greedy is optimal; the learned graph policy ties or *underperforms* no-graph (overfits). Topology-blind control suffices and is more OOD-robust.
