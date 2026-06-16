@@ -98,20 +98,22 @@ def greedy_flow_allocation(
     d: np.ndarray, power: float, outage: np.ndarray,
     anc: list[list[int]], caps: np.ndarray,
     priorities: np.ndarray, minfrac: np.ndarray, critical: np.ndarray,
+    score: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Feasible-by-construction flow-aware priority allocator (one step).
+    """Feasible-by-construction flow-aware allocator (one step).
 
-    Two passes in descending priority: (1) critical min-service floors, (2)
-    surplus to demand. Each grant is capped by remaining budget AND every
-    ancestor edge's remaining capacity, so budget+box+outage+branch-flow all
-    hold exactly without a projection. A stronger, faster baseline than
-    rule+Euclidean-projection (which de-prioritizes criticals when it spreads to
-    satisfy flow caps)."""
+    Orders nodes by `score` (descending) if given, else by `priorities` — so the
+    SAME hard allocator evaluates the rule baseline (order by priority) and any
+    learned policy (order by its per-node score). Two passes: (1) critical
+    min-service floors, (2) surplus to demand. Each grant is capped by remaining
+    budget AND every ancestor edge's remaining capacity, so budget+box+outage+
+    branch-flow all hold exactly without a projection."""
     n = d.shape[0]
     a = np.zeros(n)
     budget = float(power)
     edge_rem = caps.astype(float).copy()
-    order = np.argsort(-priorities)  # high priority first
+    key = priorities if score is None else score
+    order = np.argsort(-key)  # high score/priority first
 
     def grant(i: int, want: float) -> None:
         nonlocal budget
