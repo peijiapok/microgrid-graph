@@ -21,10 +21,8 @@ EPS = 1e-9
 
 
 def _adj_tensor(ctx: _FeederCtx) -> torch.Tensor:
-    a = np.array(ctx.scenario.adjacency_matrix, dtype=np.float32)
-    if a.size == 0:  # no adjacency -> identity (degenerate)
-        a = np.eye(len(ctx.node_order), dtype=np.float32)
-    return torch.tensor(a)
+    # honors ctx.rewire_seed (None => true adjacency; int => degree-preserving wrong-graph)
+    return torch.tensor(ctx.adjacency(getattr(ctx, "rewire_seed", None)))
 
 
 def _rule_alloc(ctx: _FeederCtx, d, power, outage) -> np.ndarray:

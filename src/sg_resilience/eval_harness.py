@@ -83,6 +83,31 @@ class _FeederCtx:
         self.oracle = make_flow_oracle(self.tree, self.critical_ids)
         self.idx = {nid: j for j, nid in enumerate(self.node_order)}
         self.cidx = [self.idx[c] for c in self.critical_ids]
+        self.rewire_seed = None  # set by callers wanting a degree-preserving wrong-graph
+
+    def adjacency(self, rewire_seed: int | None = None) -> np.ndarray:
+        """Row-normalized load adjacency; if rewire_seed given, a degree-preserving
+        random rewire (wrong-graph baseline that preserves degree but destroys real
+        connectivity)."""
+        a = np.array(self.scenario.adjacency_matrix, dtype=np.float32)
+        if a.size == 0:
+            return np.eye(len(self.node_order), dtype=np.float32)
+        if rewire_seed is None:
+            return a
+        import networkx as nx
+        g = nx.from_numpy_array((a > 0).astype(int))
+        g.remove_edges_from(nx.selfloop_edges(g))
+        # NOTE: the loader's load adjacency is distance-weighted and effectively
+        # COMPLETE, so degree-preserving rewire is ill-posed here. A proper
+        # wrong-graph test needs the sparse tree-based load adjacency (TODO).
+        try:
+            nx.double_edge_swap(g, nswap=2 * g.number_of_edges(),
+                                max_tries=20 * g.number_of_edges(), seed=rewire_seed)
+        except nx.NetworkXException:
+            pass
+        m = nx.to_numpy_array(g, nodelist=range(len(self.node_order))).astype(np.float32)
+        np.fill_diagonal(m, 1.0)
+        return m / np.clip(m.sum(axis=1, keepdims=True), 1e-9, None)
 
     def arrays(self, seed: int, p_out: float, p_stay: float, power_scale: float):
         sc = apply_markov_outages(self.scenario, p_out=p_out, p_stay=p_stay, seed=seed)

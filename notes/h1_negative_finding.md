@@ -35,6 +35,19 @@ Monotonic in congestion, tight at the congested end — the conditional graph-ne
 ## Diagnosis (confirmed by GPT-5.5)
 *"The graph is in the executor, not in the decision."* Feasibility is delegated to a shared flow-aware allocator (topology-aware for everyone). The learned policy only controls the **ordering**, and the optimal ordering is **priority-dominated**: serve highest-priority criticals until blocked. On realistic radial feeders, line capacities carry the feeder with headroom, so flow caps rarely bind on critical service → priority-greedy is LP-optimal → topology adds no decision value, only OOD overfitting risk. This is a structural property of priority-weighted continuity on capacitated radial trees, not a tuning issue (it survives 8× cap tightening and full-demand serving).
 
+## Open methodological item — adjacency is dense (affects how "graph" the GNN is)
+The loader's load adjacency (`benchmark_loader._build_load_adjacency_matrix`) is a
+distance-weighted **complete** graph (every load pair has weight 1/(1+dist) > 0).
+So the GNN message-passes over a near-dense distance kernel, not sparse feeder
+topology — which (a) weakens the topology signal (partly why GraphSAGE was only
+marginally better) and (b) makes degree-preserving rewire ill-posed (the
+wrong-graph H1 test crashed: can't rewire a complete graph). **Next step:** build
+a SPARSE tree-based load adjacency (loads adjacent iff their buses are tree-
+adjacent) so the GNN uses real sparse topology, then redo the conditional curve +
+the wrong-graph (rewire) test. The conditional result (+0.092 under congestion)
+stands on the distance-weighted graph (a legitimate but dense representation);
+sparse topology is expected to sharpen it.
+
 ## Where topology DOES become load-bearing (congestion sweep + perturbation)
 Full-demand decision room vs flow-cap scale (fraction of real line ratings):
 | feeder | capx 0.25 | 0.125 | 0.06 | 0.03 |
