@@ -85,15 +85,36 @@ class _FeederCtx:
         self.cidx = [self.idx[c] for c in self.critical_ids]
         self.rewire_seed = None  # set by callers wanting a degree-preserving wrong-graph
 
-    def adjacency(self, rewire_seed: int | None = None) -> np.ndarray:
-        """Row-normalized load adjacency; if rewire_seed given, a degree-preserving
-        random rewire (wrong-graph baseline that preserves degree but destroys real
-        connectivity)."""
-        a = np.array(self.scenario.adjacency_matrix, dtype=np.float32)
-        if a.size == 0:
-            return np.eye(len(self.node_order), dtype=np.float32)
+    def _sparse_tree_adjacency(self) -> np.ndarray:
+        """Sparse load adjacency from the radial tree: loads adjacent iff their
+        buses are equal or tree-adjacent (parent/child). Row-normalized, with
+        self-loops. This is the REAL sparse feeder topology (vs the loader's
+        distance-weighted complete graph)."""
+        n = len(self.node_order)
+        bus = [self.tree.load_bus[nid] for nid in self.node_order]
+        tree_adj = set()
+        for (u, v) in self.tree.edges:
+            tree_adj.add((u, v)); tree_adj.add((v, u))
+        m = np.eye(n, dtype=np.float32)
+        for i in range(n):
+            for j in range(i + 1, n):
+                if bus[i] == bus[j] or (bus[i], bus[j]) in tree_adj:
+                    m[i, j] = m[j, i] = 1.0
+        return m
+
+    def adjacency(self, rewire_seed: int | None = None, sparse: bool = True) -> np.ndarray:
+        """Row-normalized load adjacency. sparse=True uses the real tree topology
+        (recommended); else the loader's distance-weighted (near-complete) matrix.
+        rewire_seed gives a degree-preserving wrong-graph baseline."""
+        if sparse:
+            base = self._sparse_tree_adjacency()
+        else:
+            base = np.array(self.scenario.adjacency_matrix, dtype=np.float32)
+            if base.size == 0:
+                base = np.eye(len(self.node_order), dtype=np.float32)
         if rewire_seed is None:
-            return a
+            return base / np.clip(base.sum(axis=1, keepdims=True), 1e-9, None)
+        a = base
         import networkx as nx
         g = nx.from_numpy_array((a > 0).astype(int))
         g.remove_edges_from(nx.selfloop_edges(g))
