@@ -1,6 +1,19 @@
-# H1 negative finding — topology is not load-bearing for the *decision* (2026-06-17)
+# H1 — topology load-bearing is CONDITIONAL on constraint-binding (2026-06-17)
 
-> Decisive result from the H1 pilot + decision-room diagnostics (GPT-5.5-guided). This challenges the paper's central C2/H1 hypothesis and needs a lead decision on direction.
+> RESOLVED into a conditional result (stronger than pure negative). Pilot + decision-room diagnostics + congestion sweep + B-viability test (GPT-5.5-guided).
+
+## RESOLUTION (read first)
+Graph-necessity is **conditional on flow constraints binding**:
+- **Realistic feeders (capacity headroom):** decision-room ≈ 0; priority-greedy is optimal; the learned graph policy ties or *underperforms* no-graph (overfits). Topology-blind control suffices and is more OOD-robust.
+- **Congested/crisis regime (cap_scale≈0.03) + training against the LP-OPTIMAL set-selection:** GraphSAGE OOD C **0.982 vs DeepSets 0.898 (+0.084)** — graph is genuinely load-bearing.
+
+**Crucial:** the congested regime where topology matters is exactly the **catastrophe / scarce-power regime that motivates this project** (docs/01–02). So this is not unrealistic engineering — it is the crisis the paper is about. Both conditions (congestion AND optimal-target training) are necessary; neither alone gives a graph benefit.
+
+**Recommended paper claim:** "Topology is load-bearing for continuity control precisely in the flow-constrained crisis regime; under normal headroom, topology-blind control suffices and transfers better. Capturing the graph benefit requires optimal-target training, not greedy imitation. We characterize the decision-room→congestion relationship that governs when graph structure helps." (Caveat: +0.084 is a single modest-seed run — confirm with a multi-seed cap-scale sweep before claim-bearing.)
+
+---
+
+## Original framing (the path to the resolution)
 
 ## Evidence
 **1. H1 pilot (DeepSets vs GraphSAGE, oracle-calibrated, imitation of flow-aware greedy):**
