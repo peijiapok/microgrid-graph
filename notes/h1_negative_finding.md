@@ -14,6 +14,21 @@
 ## Diagnosis (confirmed by GPT-5.5)
 *"The graph is in the executor, not in the decision."* Feasibility is delegated to a shared flow-aware allocator (topology-aware for everyone). The learned policy only controls the **ordering**, and the optimal ordering is **priority-dominated**: serve highest-priority criticals until blocked. On realistic radial feeders, line capacities carry the feeder with headroom, so flow caps rarely bind on critical service → priority-greedy is LP-optimal → topology adds no decision value, only OOD overfitting risk. This is a structural property of priority-weighted continuity on capacitated radial trees, not a tuning issue (it survives 8× cap tightening and full-demand serving).
 
+## Where topology DOES become load-bearing (congestion sweep + perturbation)
+Full-demand decision room vs flow-cap scale (fraction of real line ratings):
+| feeder | capx 0.25 | 0.125 | 0.06 | 0.03 |
+|---|---|---|---|---|
+| case33bw | 0.000 | 0.109 | 0.115 | 0.130 |
+| rural2 | 0.000 | 0.000 | 0.000 | 0.104 |
+| mvlv-5303 | 0.000 | 0.000 | 0.001 | 0.070 |
+
+Decision room (priority-greedy sub-optimality, where topology can help) only
+appears at **~0.03–0.125× of real line ratings** — i.e. ~8–30× more congested
+than realistic feeders. Perturbation test (case33bw, capx=0.06): halving the
+single most-loaded edge shifts the LP-optimal critical set (served-weight
+0.55→0.42, L1 set change 0.90), confirming the optimal decision is genuinely
+topology/capacity-dependent **in that severe-congestion regime only**.
+
 ## Implication
 The C2/H1 claim as written — *"graph structure is load-bearing for transferable continuity control"* — is **not supported** in this formulation. Continuing to tune the learner will not fix a formulation in which the decision is topology-independent.
 
