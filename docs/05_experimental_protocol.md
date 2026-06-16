@@ -482,3 +482,25 @@ outage-rate difference is >= 0.02, keep C2 as a "distribution-shift transfer
 probe" rather than a topology-transfer probe. If normalized workloads are
 distinguishable in v2, label the result as mixed topology/workload shift and do
 not claim a structural association.
+
+### 9.1 Scarcity calibration gate (required for continuity, added 2026-06-16)
+
+Empirically established by the first baseline run (`notes/eval_v1_first_result.md`):
+the continuity metric `C` is **policy-controllable only when in-family critical
+adequacy < 1**. At default supply ratios, the budget meets all critical
+min-service every step (adequacy = 1.0), so `C` reflects exogenous outages, not
+allocation skill, and is invariant to the budget.
+
+Two requirements before any claim-bearing continuity-transfer result:
+
+1. **Per-feeder budget calibration.** Tune each feeder's budget so in-family
+   critical adequacy lands in the band **[0.65, 0.80]** (pre-registered). A
+   uniform power scale across feeders is **forbidden** for claim-bearing runs: it
+   lands each feeder in a different scarcity regime (a uniform 0.25× cut left
+   rural3 at adequacy 1.0 while the MVLV feeders collapsed to ~0.01), so the
+   resulting transfer gap measures demand/budget-ratio heterogeneity, not
+   topology. Report the calibrated per-feeder budget ratio `rho` in the workload
+   audit.
+2. **Adequacy-band check.** If a feeder's calibrated in-family adequacy falls
+   outside [0.65, 0.80], its continuity number is not claim-bearing until
+   recalibrated; record the achieved band per feeder.
