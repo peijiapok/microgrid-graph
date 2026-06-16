@@ -57,6 +57,24 @@ def test_outage_forces_zero():
     assert a[1] <= 1e-6
 
 
+def test_greedy_allocation_feasible_by_construction():
+    from sg_resilience.flow_projection import greedy_flow_allocation, node_ancestor_edges
+    from sg_resilience.topology import flow_violations
+    tree = build_radial_tree(_line_chain())  # caps ~0.346 MW/edge
+    order = ["load_0", "load_1", "load_2"]
+    anc, caps = node_ancestor_edges(tree, order)
+    d = np.array([0.2, 0.2, 0.2])
+    pr = np.array([3.0, 2.0, 1.0]); mf = np.full(3, 0.5); crit = np.array([True, True, True])
+    outage = np.array([False, True, False])  # load_1 outaged
+    a = greedy_flow_allocation(d, power=10.0, outage=outage, anc=anc, caps=caps,
+                               priorities=pr, minfrac=mf, critical=crit)
+    assert a[1] == 0.0                                   # outaged -> 0
+    assert np.all(a >= -1e-12) and np.all(a <= d + 1e-9)  # box
+    assert not flow_violations(tree, dict(zip(order, a)))  # branch-flow respected
+    # root edge cap ~0.346 binds: total served below cap
+    assert a.sum() <= tree.edge_capacity_mw[(0, 1)] + 1e-9
+
+
 def test_flow_oracle_caps_bind():
     """Root cap ~0.346 MW; three critical loads each needing 0.2 min-service
     cannot all be continuously served -> oracle commits a strict subset."""

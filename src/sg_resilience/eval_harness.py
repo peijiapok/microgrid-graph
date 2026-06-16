@@ -1,18 +1,19 @@
-"""End-to-end evaluation harness — first cross-topology transfer result.
+"""End-to-end evaluation harness — cross-topology continuity transfer.
 
-Wires the v1 components into one pipeline for a non-learned baseline (priority
-allocator), producing per-feeder and transfer-gap numbers on the frozen split:
-
-    load feeder -> Markov outages -> priority baseline -> project onto Delta_grid
-    -> continuity metric C (flow oracle) -> per-feeder aggregate -> transfer gap.
-
-This establishes the pipeline and a baseline transfer profile WITHOUT training or
-Fanchen's differentiable projection (it uses the reference projection). Learned
-policies (GraphSAGE/C1) and the differentiable projection plug into the same
-`policy` / projection slots later.
+Methodology (ADR-0003, GPT-5.5-backed):
+  - long horizon (T>=64) so temporal continuity is measurable past outage
+    persistence (~10 steps);
+  - per-feeder budget calibrated to the OFFLINE ORACLE's critical serviceable
+    fraction (policy-independent "physical opportunity"), NOT a rule baseline;
+  - calibration seeds disjoint from eval seeds; seeds paired across policies;
+  - feasible-by-construction flow-aware GREEDY allocator (no per-step QP), so
+    eval scales to long horizons and many seeds. The cvxpy projection
+    (flow_projection.project_onto_delta_grid) remains the correctness oracle and
+    the projection layer for learned policies.
 """
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from typing import Any, cast
 
@@ -20,147 +21,160 @@ import numpy as np
 import yaml
 
 from . import metrics_v1 as M
-from .baseline_rule import priority_first_allocation
 from .benchmark_loader import _load_pandapower_benchmark, _load_simbench_benchmark
-from .flow_projection import make_flow_oracle, project_onto_delta_grid
+from .flow_projection import greedy_flow_allocation, make_flow_oracle, node_ancestor_edges
 from .outages import apply_markov_outages
 from .scenario_schema import Scenario
 from .topology import build_radial_tree
 
 
-def _feeder_config(entry: dict[str, Any]) -> dict[str, Any]:
-    """Build a loader raw-config from a split-file feeder entry."""
-    src = entry["source"]
-    common = {
-        "horizon": entry.get("horizon", 8),
-        "default_min_service_fraction": 0.2,
-        "critical_min_service_fraction": 0.55,
-        "critical_top_k": entry.get("critical_top_k", 0) or None,
-    }
-    if src == "pandapower":
-        bench = {"source": "pandapower", "name": entry["code"],
-                 "horizon": entry.get("horizon", 4),
-                 "demand_profile": entry.get("demand_profile", [1.0, 0.95, 1.05, 1.0]),
+def _daily_profile(T: int) -> list[float]:
+    return [round(0.8 + 0.2 * math.cos(2 * math.pi * t / max(T, 1)), 4) for t in range(T)]
+
+
+def _feeder_config(entry: dict[str, Any], horizon: int) -> dict[str, Any]:
+    common = {"default_min_service_fraction": 0.2, "critical_min_service_fraction": 0.55}
+    if entry["source"] == "pandapower":
+        bench = {"source": "pandapower", "name": entry["code"], "horizon": horizon,
+                 "demand_profile": _daily_profile(horizon),
                  "supply_ratio": entry.get("supply_ratio", 0.75)}
     else:
-        bench = {"source": "simbench", "code": entry["code"],
-                 "horizon": entry.get("horizon", 8), "start_index": 0, "stride": 4,
+        bench = {"source": "simbench", "code": entry["code"], "horizon": horizon,
+                 "start_index": 0, "stride": 1,
                  "dispatchable_supply_ratio": entry.get("dispatchable_supply_ratio", 0.55)}
-    for k, v in common.items():
-        if v is not None and k not in bench:
-            bench.setdefault(k, v)
+    bench.update(common)
     return {"benchmark": bench, "metadata": {"role": entry.get("role", "")}}
 
 
 def _net_for(entry: dict[str, Any]):
     import pandapower.networks as ppn
     import simbench
-    if entry["source"] == "pandapower":
-        return getattr(ppn, entry["code"])()
-    return simbench.get_simbench_net(entry["code"])
+    return (getattr(ppn, entry["code"])() if entry["source"] == "pandapower"
+            else simbench.get_simbench_net(entry["code"]))
 
 
-def _load_scenario(entry: dict[str, Any]) -> Scenario:
-    raw = _feeder_config(entry)
-    if entry["source"] == "pandapower":
-        return _load_pandapower_benchmark(raw)
-    return _load_simbench_benchmark(raw)
+def _load_scenario(entry: dict[str, Any], horizon: int) -> Scenario:
+    raw = _feeder_config(entry, horizon)
+    return (_load_pandapower_benchmark(raw) if entry["source"] == "pandapower"
+            else _load_simbench_benchmark(raw))
+
+
+class _FeederCtx:
+    """Loaded-once per-feeder context reused across seeds/calibration."""
+    def __init__(self, entry: dict[str, Any], horizon: int):
+        self.scenario = _load_scenario(entry, horizon)
+        net = _net_for(entry)
+        self.tree = build_radial_tree(net, line_capacity_mw=entry.get("line_capacity_mw_override"))
+        self.node_order = [n.node_id for n in self.scenario.nodes]
+        self.priorities = np.array([n.priority for n in self.scenario.nodes])
+        self.minfrac = np.array([n.min_service_fraction for n in self.scenario.nodes])
+        self.critical_mask = np.array([n.is_critical for n in self.scenario.nodes])
+        self.critical_ids = [n.node_id for n in self.scenario.nodes if n.is_critical]
+        self.cm = np.array([self.minfrac[j] for j, n in enumerate(self.scenario.nodes) if n.is_critical])
+        self.cw = np.array([self.priorities[j] for j, n in enumerate(self.scenario.nodes) if n.is_critical])
+        self.anc, self.caps = node_ancestor_edges(self.tree, self.node_order)
+        self.oracle = make_flow_oracle(self.tree, self.critical_ids)
+        self.idx = {nid: j for j, nid in enumerate(self.node_order)}
+        self.cidx = [self.idx[c] for c in self.critical_ids]
+
+    def arrays(self, seed: int, p_out: float, p_stay: float, power_scale: float):
+        sc = apply_markov_outages(self.scenario, p_out=p_out, p_stay=p_stay, seed=seed)
+        T, n = len(sc.states), len(self.node_order)
+        D = np.zeros((T, n)); OUT = np.zeros((T, n), dtype=bool); P = np.zeros(T)
+        for t, st in enumerate(sc.states):
+            outaged = set(st.outages)
+            for nid in self.node_order:
+                D[t, self.idx[nid]] = float(st.demands[nid])
+            OUT[t] = np.array([nid in outaged for nid in self.node_order], dtype=bool)
+            P[t] = float(st.available_power) * power_scale
+        return D, OUT, P
+
+
+def _oracle_fraction(ctx: _FeederCtx, seeds: Sequence[int], p_out, p_stay, ps) -> float:
+    """Mean (over seeds) weighted fraction of critical load the OFFLINE ORACLE can
+    keep continuously serviceable, excluding fully-outaged critical nodes."""
+    fracs = []
+    for seed in seeds:
+        D, OUT, P = ctx.arrays(seed, p_out, p_stay, ps)
+        dc, oc = D[:, ctx.cidx], OUT[:, ctx.cidx]
+        cont = ctx.oracle(dc, ctx.cm, ctx.cw, P, oc)
+        has_active = ~oc.all(axis=0)  # node has >=1 non-outaged step
+        denom = float(np.sum(ctx.cw * has_active))
+        if denom > 0:
+            fracs.append(float(np.sum(ctx.cw * cont * has_active)) / denom)
+    return float(np.mean(fracs)) if fracs else 0.0
+
+
+def calibrate_budget_oracle(
+    ctx: _FeederCtx, calib_seeds: Sequence[int], band=(0.65, 0.80),
+    p_out=0.05, p_stay=0.85, lo=0.02, hi=4.0, max_iter=18,
+) -> dict[str, Any]:
+    """Bisect budget scale so the oracle serviceable fraction lands in `band`
+    (monotone in budget). Policy-independent; uses calibration seeds only."""
+    low_b, high_b = band
+    f = lambda ps: _oracle_fraction(ctx, calib_seeds, p_out, p_stay, ps)
+    if f(hi) < low_b:
+        return {"power_scale": hi, "oracle_frac": f(hi), "status": "below_band_at_max"}
+    if f(lo) > high_b:
+        return {"power_scale": lo, "oracle_frac": f(lo), "status": "above_band_at_min"}
+    ps = hi
+    for _ in range(max_iter):
+        ps = 0.5 * (lo + hi); v = f(ps)
+        if v > high_b: hi = ps
+        elif v < low_b: lo = ps
+        else: return {"power_scale": ps, "oracle_frac": v, "status": "in_band"}
+    return {"power_scale": ps, "oracle_frac": f(ps), "status": "max_iter"}
 
 
 def evaluate_feeder(
-    entry: dict[str, Any],
-    seeds: Sequence[int] = (0, 1, 2),
-    p_out: float = 0.05,
-    p_stay: float = 0.85,
-    windows: tuple[int, ...] = (2, 4),
-    power_scale: float = 1.0,
+    ctx: _FeederCtx, seeds: Sequence[int], power_scale: float,
+    p_out=0.05, p_stay=0.85, windows=(4, 8, 16),
 ) -> dict[str, Any]:
-    """Run the priority baseline through the full pipeline on one feeder.
-
-    power_scale < 1 tightens scarcity (scales available power per step) so the
-    policy — not exogenous outages — becomes the binding factor for continuity.
-    """
-    scenario = _load_scenario(entry)
-    net = _net_for(entry)
-    line_cap = entry.get("line_capacity_mw_override")
-    tree = build_radial_tree(net, line_capacity_mw=line_cap)
-
-    node_order = [n.node_id for n in scenario.nodes]
-    priorities = {n.node_id: n.priority for n in scenario.nodes}
-    minfrac = {n.node_id: n.min_service_fraction for n in scenario.nodes}
-    critical_ids = [n.node_id for n in scenario.nodes if n.is_critical]
-    crit_set = set(critical_ids)
-    m_arr = np.array([minfrac[i] for i in critical_ids])
-    w_arr = np.array([priorities[i] for i in critical_ids])
-    oracle = make_flow_oracle(tree, critical_ids)
-
-    per_seed: list[dict[str, float]] = []
+    """Flow-aware greedy allocator through the pipeline; mean metrics over seeds."""
+    per_seed = []
     for seed in seeds:
-        sc = apply_markov_outages(scenario, p_out=p_out, p_stay=p_stay, seed=seed)
-        T = len(sc.states)
-        A = np.zeros((T, len(critical_ids)))
-        D = np.zeros((T, len(critical_ids)))
-        OUT = np.zeros((T, len(critical_ids)), dtype=bool)
-        power = np.zeros(T)
-        for t, st in enumerate(sc.states):
-            outaged = set(st.outages)
-            budget = float(st.available_power) * power_scale
-            # baseline: zero demand for outaged nodes so it doesn't waste budget
-            dem = {nid: (0.0 if nid in outaged else float(st.demands[nid])) for nid in node_order}
-            raw_alloc = priority_first_allocation(
-                budget, dem, priorities, minfrac, crit_set
-            )
-            z = np.array([raw_alloc[nid] for nid in node_order])
-            d_full = np.array([float(st.demands[nid]) for nid in node_order])
-            out_full = np.array([nid in outaged for nid in node_order], dtype=bool)
-            a = project_onto_delta_grid(z, d_full, budget, out_full, tree, node_order)
-            idx = {nid: j for j, nid in enumerate(node_order)}
-            for ci, cid in enumerate(critical_ids):
-                A[t, ci] = a[idx[cid]]
-                D[t, ci] = float(st.demands[cid])
-                OUT[t, ci] = cid in outaged
-            power[t] = budget
-        res = M.rollout_metrics(A, D, m_arr, w_arr, power, OUT,
+        D, OUT, P = ctx.arrays(seed, p_out, p_stay, power_scale)
+        T = D.shape[0]
+        A = np.zeros((T, len(ctx.node_order)))
+        for t in range(T):
+            A[t] = greedy_flow_allocation(D[t], P[t], OUT[t], ctx.anc, ctx.caps,
+                                          ctx.priorities, ctx.minfrac, ctx.critical_mask)
+        res = M.rollout_metrics(A[:, ctx.cidx], D[:, ctx.cidx], ctx.cm, ctx.cw, P,
+                                OUT[:, ctx.cidx],
                                 windows=tuple(L for L in windows if L <= T),
-                                oracle=oracle)
+                                oracle=ctx.oracle)
         per_seed.append({k: float(v) for k, v in res.items() if not isinstance(v, dict)})
-
-    def agg(key: str) -> float:
-        return float(np.mean([s[key] for s in per_seed]))
-
-    return {
-        "feeder": entry["id"],
-        "role": entry.get("role"),
-        "n_loads": len(node_order),
-        "n_critical": len(critical_ids),
-        "seeds": list(seeds),
-        "C": agg("C"),
-        "critical_load_adequacy": agg("critical_load_adequacy"),
-        "critical_coverage": agg("critical_coverage"),
-        "weighted_starvation": agg("weighted_starvation"),
-        "per_seed_C": [s["C"] for s in per_seed],
-    }
+    agg = lambda k: float(np.mean([s[k] for s in per_seed]))
+    return {"C": agg("C"), "critical_load_adequacy": agg("critical_load_adequacy"),
+            "critical_coverage": agg("critical_coverage"),
+            "weighted_starvation": agg("weighted_starvation"),
+            "per_seed_C": [s["C"] for s in per_seed]}
 
 
-def run_split(split_yaml: str, **kwargs: Any) -> dict[str, Any]:
-    """Evaluate the baseline across the frozen split; compute the transfer gap on C."""
+def run_split_calibrated(
+    split_yaml: str, horizon: int = 64,
+    calib_seeds: Sequence[int] = tuple(range(100, 116)),
+    eval_seeds: Sequence[int] = tuple(range(24)),
+    band=(0.65, 0.80), windows=(4, 8, 16), **kw,
+) -> dict[str, Any]:
+    """Oracle-calibrated, long-horizon cross-topology transfer on the frozen split."""
     split = cast(dict[str, Any], yaml.safe_load(open(split_yaml, encoding="utf-8")))
-    results = {"train": [], "ood": []}
+    results: dict[str, list[dict[str, Any]]] = {"train": [], "ood": []}
     for role, key in (("train", "G_train"), ("ood", "G_ood")):
         for entry in split.get(key, []):
-            e = dict(entry)
-            e["role"] = role
-            results[role].append(evaluate_feeder(e, **kwargs))
-
-    def mean_C(rows: list[dict[str, Any]]) -> float:
-        return float(np.mean([r["C"] for r in rows])) if rows else 0.0
-
-    mu_train, mu_ood = mean_C(results["train"]), mean_C(results["ood"])
-    return {
-        "metric": "continuity_C",
-        "mu_train_C": mu_train,
-        "mu_ood_C": mu_ood,
-        "transfer_gap_C": M.transfer_gap(mu_train, mu_ood, higher_is_better=True),
-        "per_feeder": results,
-        "policy": "priority_baseline+Delta_grid_projection",
-    }
+            e = dict(entry); e["role"] = role
+            ctx = _FeederCtx(e, horizon)
+            cal = calibrate_budget_oracle(ctx, calib_seeds, band=band, **kw)
+            r = evaluate_feeder(ctx, eval_seeds, cal["power_scale"], windows=windows, **kw)
+            r.update({"feeder": e["id"], "n_loads": len(ctx.node_order),
+                      "n_critical": len(ctx.critical_ids),
+                      "calibrated_power_scale": cal["power_scale"],
+                      "calib_oracle_frac": cal["oracle_frac"], "calib_status": cal["status"]})
+            results[role].append(r)
+    mC = lambda rows: float(np.mean([x["C"] for x in rows])) if rows else 0.0
+    mu_t, mu_o = mC(results["train"]), mC(results["ood"])
+    return {"metric": "continuity_C", "horizon": horizon,
+            "calibration": {"target_band": list(band), "basis": "offline_oracle_serviceable_fraction"},
+            "mu_train_C": mu_t, "mu_ood_C": mu_o,
+            "transfer_gap_C": M.transfer_gap(mu_t, mu_o, higher_is_better=True),
+            "per_feeder": results, "policy": "flow_aware_greedy"}

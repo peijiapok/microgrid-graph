@@ -12,15 +12,15 @@ import json
 import sys
 from pathlib import Path
 
-from sg_resilience.eval_harness import run_split
+from sg_resilience.eval_harness import run_split_calibrated
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> int:
     split = str(ROOT / "configs" / "topology_split_v1.yaml")
-    print("[eval] running priority baseline + Delta_grid projection on frozen split...")
-    out = run_split(split, seeds=(0, 1, 2))
+    print("[eval] oracle-calibrated, T=64 flow-aware greedy baseline on frozen split (ADR-0003)...")
+    out = run_split_calibrated(split)
 
     print("\n=== Per-feeder continuity C (priority baseline) ===")
     hdr = f"{'feeder':26} {'role':6} {'loads':>5} {'crit':>4} {'C':>6} {'adeq':>6} {'cover':>6} {'starv':>6}"

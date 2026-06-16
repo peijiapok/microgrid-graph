@@ -82,6 +82,58 @@ def project_onto_delta_grid(
     return np.clip(a.value, 0.0, upper)  # clip tiny solver overshoot back into box
 
 
+def node_ancestor_edges(tree: RadialTree, node_order: Sequence[str]):
+    """Per node (in node_order): indices of finite-capacity ancestor edges, plus
+    the finite-edge capacity vector. Used by the feasible-by-construction greedy
+    allocator (no QP) so eval scales to long horizons / many seeds."""
+    finite_edges = [e for e in tree.edges if np.isfinite(tree.edge_capacity_mw[e])]
+    caps = np.array([tree.edge_capacity_mw[e] for e in finite_edges])
+    anc = []
+    for nid in node_order:
+        anc.append([ei for ei, e in enumerate(finite_edges) if nid in tree.subtree_loads[e]])
+    return anc, caps
+
+
+def greedy_flow_allocation(
+    d: np.ndarray, power: float, outage: np.ndarray,
+    anc: list[list[int]], caps: np.ndarray,
+    priorities: np.ndarray, minfrac: np.ndarray, critical: np.ndarray,
+) -> np.ndarray:
+    """Feasible-by-construction flow-aware priority allocator (one step).
+
+    Two passes in descending priority: (1) critical min-service floors, (2)
+    surplus to demand. Each grant is capped by remaining budget AND every
+    ancestor edge's remaining capacity, so budget+box+outage+branch-flow all
+    hold exactly without a projection. A stronger, faster baseline than
+    rule+Euclidean-projection (which de-prioritizes criticals when it spreads to
+    satisfy flow caps)."""
+    n = d.shape[0]
+    a = np.zeros(n)
+    budget = float(power)
+    edge_rem = caps.astype(float).copy()
+    order = np.argsort(-priorities)  # high priority first
+
+    def grant(i: int, want: float) -> None:
+        nonlocal budget
+        if want <= 0 or outage[i]:
+            return
+        cap_room = min((edge_rem[e] for e in anc[i]), default=np.inf)
+        g = min(want, budget, cap_room)
+        if g <= 0:
+            return
+        a[i] += g
+        budget -= g
+        for e in anc[i]:
+            edge_rem[e] -= g
+
+    for i in order:  # pass 1: critical floors
+        if critical[i]:
+            grant(int(i), minfrac[i] * d[i] - a[i])
+    for i in order:  # pass 2: surplus to full demand
+        grant(int(i), d[i] - a[i])
+    return a
+
+
 def make_flow_oracle(
     tree: RadialTree, critical_node_ids: Sequence[str]
 ) -> Callable[..., np.ndarray]:

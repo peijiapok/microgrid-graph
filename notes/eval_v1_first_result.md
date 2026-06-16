@@ -1,5 +1,7 @@
 # First cross-topology evaluation result (baseline) — 2026-06-16
 
+> **Superseded by ADR-0003 for methodology + final numbers.** This note records the *exploratory* findings (loose-scarcity ≈0 gap, policy-controllability, uniform-scarcity confound) that motivated the methodology fix. The trustworthy result uses oracle-calibrated, T=64, disjoint paired seeds (`notes/adr/0003-continuity-eval-methodology.md`): mean C train 0.97 / OOD 0.99, transfer_gap[C] ≈ 0 for the flow-aware greedy reference. Additional finding from that work: **branch-flow caps (topology), not budget, dominate critical-service difficulty in real LV/MVLV feeders** — strong graph-necessity evidence.
+
 Pipeline: `src/sg_resilience/eval_harness.py`, runner `scripts/run_eval_v1.py`.
 Policy: priority allocator → projection onto `Δ_grid` (reference). Metric: capacity-normalized continuity `C` (`metrics_v1`) with the flow-constrained oracle. 3 seeds, Markov outages (p_out=0.05, p_stay=0.85).
 

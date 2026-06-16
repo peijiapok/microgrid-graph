@@ -491,16 +491,28 @@ adequacy < 1**. At default supply ratios, the budget meets all critical
 min-service every step (adequacy = 1.0), so `C` reflects exogenous outages, not
 allocation skill, and is invariant to the budget.
 
-Two requirements before any claim-bearing continuity-transfer result:
+Requirements before any claim-bearing continuity-transfer result (full
+methodology + rationale in `notes/adr/0003-continuity-eval-methodology.md`):
 
-1. **Per-feeder budget calibration.** Tune each feeder's budget so in-family
-   critical adequacy lands in the band **[0.65, 0.80]** (pre-registered). A
-   uniform power scale across feeders is **forbidden** for claim-bearing runs: it
-   lands each feeder in a different scarcity regime (a uniform 0.25× cut left
-   rural3 at adequacy 1.0 while the MVLV feeders collapsed to ~0.01), so the
-   resulting transfer gap measures demand/budget-ratio heterogeneity, not
-   topology. Report the calibrated per-feeder budget ratio `rho` in the workload
-   audit.
-2. **Adequacy-band check.** If a feeder's calibrated in-family adequacy falls
-   outside [0.65, 0.80], its continuity number is not claim-bearing until
-   recalibrated; record the achieved band per feeder.
+1. **Horizon T ≥ 64** (default 64; sensitivity at 96/128). T=4–8 cannot measure
+   continuity: outage persistence is ~1/(1−p_stay) ≈ 10 steps and windows up to
+   8 are degenerate on an 8-step rollout.
+2. **Per-feeder budget calibrated to the OFFLINE ORACLE's critical serviceable
+   fraction**, target band **[0.65, 0.80]** (pre-registered). The oracle is
+   policy-independent ("physical opportunity"); calibrating to a *rule baseline*
+   confounds difficulty with the heuristic's weakness and is forbidden. A uniform
+   power scale across feeders is also forbidden (it lands each feeder at a
+   different difficulty — a uniform 0.25× cut left rural3 at adequacy 1.0 while
+   MVLV collapsed to ~0.01 — so the gap measures demand/budget heterogeneity, not
+   topology). Fixed-budget-ratio is a robustness appendix only.
+3. **Seeds:** calibration seeds **disjoint** from eval seeds; seeds **paired**
+   across policies within a feeder. Claim-bearing: ≥32 calibration / ≥50 eval
+   (≥16 / ≥24 acceptable for development).
+4. **Report per feeder:** calibrated budget ratio `rho`, achieved oracle
+   fraction, critical-load fraction, and flow-tightness, as covariates. Framing:
+   "cross-topology quality under matched oracle-normalized scarcity."
+
+Reference baseline (T=64, oracle-calibrated, 24 eval seeds): all feeders in band
+(oracle_frac 0.70–0.77); flow-aware greedy rule reaches mean C train 0.97 / OOD
+0.99, transfer_gap[C] ≈ 0 — the ceiling learned policies must match while
+proving graph-necessity.
