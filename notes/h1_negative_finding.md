@@ -29,6 +29,24 @@ single most-loaded edge shifts the LP-optimal critical set (served-weight
 0.55→0.42, L1 set change 0.90), confirming the optimal decision is genuinely
 topology/capacity-dependent **in that severe-congestion regime only**.
 
+## Congestion-stratified LEARNED H1 (DeepSets vs GraphSAGE vs cap-scale)
+| cap_scale | graph OOD C | no-graph OOD C | graph−nograph |
+|---|---|---|---|
+| 1.0 (realistic) | 0.968 | 0.926 | +0.042 |
+| 0.125 | 0.968 | 0.926 | +0.042 |
+| 0.06 | 0.916 | 0.931 | −0.016 |
+| 0.03 (severe) | 0.864 | 0.913 | **−0.049** |
+
+The learned graph advantage **decreases** with congestion (opposite of the hoped
+curve), and the realistic-cap value (+0.042) is within run-to-run noise (pilot
+was −0.058) → net ≈ 0. Critical insight: decision-room exists under congestion,
+but **both policies imitate the priority-greedy rule, which is itself suboptimal
+there** — so the GNN cannot exploit the topology-dependent room and its capacity
+overfits. **A positive graph result requires BOTH (a) congestion (room exists)
+AND (b) training against the OPTIMAL set-selection (LP/oracle), not the greedy
+rule. Neither alone is sufficient** (decisive B-viability test, not yet run:
+train against LP-optimal targets at cap_scale≈0.03).
+
 ## Implication
 The C2/H1 claim as written — *"graph structure is load-bearing for transferable continuity control"* — is **not supported** in this formulation. Continuing to tune the learner will not fix a formulation in which the decision is topology-independent.
 

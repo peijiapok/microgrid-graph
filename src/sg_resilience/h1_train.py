@@ -109,13 +109,13 @@ def train_policy(kind: str, train_ctxs, scales, val_seeds, epochs=40, lr=2e-3,
 
 def run_h1(split_yaml: str, horizon=64, calib_seeds=tuple(range(100, 112)),
            train_seeds=tuple(range(8)), eval_seeds=tuple(range(8, 20)),
-           kinds=("deepsets", "graphsage"), band=(0.65, 0.80)) -> dict:
+           kinds=("deepsets", "graphsage"), band=(0.65, 0.80), cap_scale=1.0) -> dict:
     import yaml
     split = yaml.safe_load(open(split_yaml, encoding="utf-8"))
     train_entries = [dict(e, role="train") for e in split["G_train"]]
     ood_entries = [dict(e, role="ood") for e in split["G_ood"]]
-    train_ctxs = [_FeederCtx(e, horizon) for e in train_entries]
-    ood_ctxs = [_FeederCtx(e, horizon) for e in ood_entries]
+    train_ctxs = [_FeederCtx(e, horizon, cap_scale=cap_scale) for e in train_entries]
+    ood_ctxs = [_FeederCtx(e, horizon, cap_scale=cap_scale) for e in ood_entries]
     scales = [calibrate_budget_oracle(c, calib_seeds, band=band)["power_scale"] for c in train_ctxs]
     ood_scales = [calibrate_budget_oracle(c, calib_seeds, band=band)["power_scale"] for c in ood_ctxs]
 

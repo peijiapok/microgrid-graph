@@ -60,11 +60,18 @@ def _load_scenario(entry: dict[str, Any], horizon: int) -> Scenario:
 
 
 class _FeederCtx:
-    """Loaded-once per-feeder context reused across seeds/calibration."""
-    def __init__(self, entry: dict[str, Any], horizon: int):
+    """Loaded-once per-feeder context reused across seeds/calibration.
+
+    cap_scale scales every branch-flow capacity F_e (1.0 = real ratings); used to
+    study where topology becomes load-bearing under congestion (see
+    notes/h1_negative_finding.md)."""
+    def __init__(self, entry: dict[str, Any], horizon: int, cap_scale: float = 1.0):
         self.scenario = _load_scenario(entry, horizon)
         net = _net_for(entry)
         self.tree = build_radial_tree(net, line_capacity_mw=entry.get("line_capacity_mw_override"))
+        if cap_scale != 1.0:
+            for e in self.tree.edge_capacity_mw:
+                self.tree.edge_capacity_mw[e] *= cap_scale
         self.node_order = [n.node_id for n in self.scenario.nodes]
         self.priorities = np.array([n.priority for n in self.scenario.nodes])
         self.minfrac = np.array([n.min_service_fraction for n in self.scenario.nodes])
