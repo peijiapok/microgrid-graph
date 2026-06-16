@@ -1,10 +1,12 @@
 # 02 — Research Goal
 
-> Last revised 2026-04-22. Reads as the abstract-plus-limits of the target paper. If a claim does not appear here, we do not make it.
+> Last revised 2026-06-16 (was 2026-04-22). Reads as the abstract-plus-limits of the target paper. If a claim does not appear here, we do not make it.
+>
+> **2026-06-16 reframing (ADR-0001):** primary target is **temporal continuity of critical service** under a **flow-constrained** feasible set `Δ_grid`. "Flow-constrained," not "physics-aware" — we enforce linear radial branch-flow capacities, not AC power flow.
 
 ## 1. One-sentence pitch
 
-When a distribution grid is in crisis, a physics-aware graph policy — trained on a family of feeder topologies with a CVaR-minimax objective and a differentiable feasibility projection — must generalize zero-shot to unseen topologies and keep critical infrastructure online; we provide such a policy, a graph-mining-native structural-similarity metric that predicts how well it will transfer *before training*, and a bound on the worst-case continuity gap in terms of GNN expressivity, structural coverage, and adversary budget.
+When a distribution grid is in crisis, a **flow-constrained** graph policy — trained on a family of feeder topologies with a CVaR-minimax objective and a differentiable projection onto the branch-flow-capacitated allocation polytope `Δ_grid` — must generalize zero-shot to unseen topologies and keep critical infrastructure **continuously online**; we provide such a policy, a graph-mining-native structural-similarity metric that predicts how well it will transfer *before training*, and a bound on the worst-case **continuity** gap in terms of GNN expressivity, structural coverage, and adversary budget. The primary metric is capacity-normalized windowed continuity `C`; topology is load-bearing precisely because `Δ_grid` makes an unseen feeder change what is continuously deliverable.
 
 ## 1a. Why this matters
 
@@ -18,7 +20,7 @@ The contributions are organized so each **kills one specific NeurIPS-review-kill
 
 **Review-killer it addresses:** "graph structure is decorative; an MLP would work."
 
-**What.** Replace the plain symmetric SAGE operator in `controller_model.py` with an operator that respects the directed, weighted, capacity-constrained nature of power flow. Edge features include line admittance, thermal capacity, and (optional) distance-to-source.
+**What.** Replace the plain symmetric SAGE operator in `controller_model.py` with a **directed MPNN / Graph-Network block** (decided 2026-06-16; spec in `notes/work_order_fanchen_2026-06-16.md`): two arcs per line (up/downstream), edge features [admittance, log F_e, direction], **capacity-gated messages** `g_uv=σ(φ_g(e,h_u,h_v))`, sum aggregation, GRU update. Asymmetric along the feeder, capacity-aware, permutation-equivariant, size-generalizing.
 
 **Done-when.** (i) An MLP ablation loses ≥ Δ on critical continuity on at least one in-family feeder. (ii) A scrambled-edge ablation loses ≥ Δ on the same metric. (iii) The flow-aware operator matches or beats SAGE on every completed feeder.
 
@@ -28,15 +30,15 @@ The contributions are organized so each **kills one specific NeurIPS-review-kill
 
 **What.** Train once on a curated family G_train of feeders. Evaluate zero-shot on a held-out family G_ood. Report the transfer gap for every metric. In parallel, produce a **structural feeder atlas** cataloguing every candidate feeder by graph-mining-native properties (degree-distribution moments, clustering, spectral gap, algebraic connectivity, diameter, motif / graphlet counts up to k=4, community signature) so that splits are principled, not accidental.
 
-**Done-when.** (i) A single policy evaluated on at least two held-out feeder families has mean critical continuity within Δ_max of the in-family value. (ii) The same policy is tested at multiple feeder sizes (|V| ratios) to demonstrate size-generalization. (iii) `configs/feeder_atlas.yaml` lists every evaluated feeder with its structural fingerprint. (iv) Every split referenced in the paper is justified by a structural-distance computation against the atlas, not by convenience.
+**Done-when.** (i) A single policy evaluated on the held-out feeders (frozen split, `configs/topology_split_v1.yaml` / ADR-0002) has capacity-normalized continuity `C` within Δ_transfer of the in-family value. (ii) The same policy is tested at larger feeder sizes (MVLV-urban OOD, |V| > all train feeders) to demonstrate size-generalization. (iii) `configs/feeder_atlas.yaml` lists every evaluated feeder with its structural fingerprint (v2). (iv) Every split referenced in the paper is justified structurally, not by convenience.
 
 ### C3. Differentiable feasibility projection
 
 **Review-killer it addresses:** "your 'projection' is an iterative water-filler with a loop bound; prove feasibility exactly, end-to-end differentiable."
 
-**What.** Replace the iterative `project_allocation()` with a closed-form (or fixed-iteration) projection onto the allocation polytope {a ≥ 0, a ≤ d, Σa ≤ P}. Give a formal feasibility certificate. Keep it differentiable for end-to-end training.
+**What.** Differentiable projection onto the **flow-constrained** polytope `Δ_grid = {a ≥ 0, a ≤ d, a=0 on outage, Σa ≤ P, |f_e(a)| ≤ F_e ∀ tree edge e}`. Decided 2026-06-16: ship a cvxpylayers/OptNet differentiable QP layer first (gate: match the reference `flow_projection.project_onto_delta_grid` within 1e-6 + finite-diff gradient check), then a near-linear **laminar tree-DP** projection as a stretch contribution (subtree-sum rows form a laminar family). Spec: `notes/work_order_fanchen_2026-06-16.md`.
 
-**Done-when.** (i) Theorem 2 (`06_theory_sketch.md`) holds: outputs satisfy all three hard constraints exactly. (ii) Gradient flow through the projection is verified on small cases. (iii) No performance regression vs. the iterative version.
+**Done-when.** (i) Outputs satisfy all four hard constraints (incl. branch-flow) within `epsilon_feas`. (ii) Gradient flow verified on small cases. (iii) No performance regression vs. the reference projection.
 
 ### C4. CVaR-minimax objective with regret bound
 
@@ -67,7 +69,7 @@ The contributions are organized so each **kills one specific NeurIPS-review-kill
 ## 3. What we will NOT claim
 
 - Universal dominance over rule/optimization baselines on every metric on every feeder.
-- Physics-constrained learning (power-flow solver in the loop).
+- Physics-constrained learning with an AC/DC power-flow solver in the loop. (We DO enforce linear radial branch-flow *capacity* constraints in `Δ_grid`; we do NOT solve power flow. Call it "flow-constrained," never "physics-aware.")
 - Real-world deployment readiness.
 - Cross-grid-type transfer (transmission ↔ distribution).
 - Safety in the formal control-theoretic sense beyond the stated feasibility theorem.
@@ -76,7 +78,7 @@ These exclusions are contractual. Any draft sentence that strays into one of the
 
 ## 4. Success criteria (hierarchical)
 
-- **Gate 1 — Viability.** C1 and C2 both achieve their done-when clauses on at least the four existing feeders (case33bw, rural1, rural2, LV-urban) plus one newly added OOD feeder. No theory yet.
+- **Gate 1 — Viability.** C1 and C2 both achieve their done-when clauses on the frozen split (train: case33bw, LV-rural2, LV-rural3; OOD: LV-urban6, MVLV-urban-5.303, MVLV-urban-6.305 — ADR-0002), measured on the primary continuity metric `C`. No theory yet.
 - **Gate 2 — Workshop-ready (NeurIPS workshop 2026, target July–August).** Gate 1 + C5 complete + draft theory for C3.
 - **Gate 3 — Main-conference-ready (NeurIPS 2027).** All five contributions complete; Theorems 1–3 proved; ablations; writing.
 - **Gate 4 — "Best paper" posture.** C6 delivers on its done-when in full: d_struct is non-vacuous in Theorem 1, R² > 0.5 on at least two metrics (not one), and the atlas covers IEEE 123 plus two additional OOD families. Further extensions (expressivity characterizations specific to constrained allocation, a learned d_struct variant) evaluated at Gate 3.

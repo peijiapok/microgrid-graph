@@ -36,20 +36,16 @@ def _normalized_static_features(
 
 
 def _build_network_graph(net: Any) -> Any:
-    nx = cast(Any, importlib.import_module("networkx"))
-    graph = nx.Graph()
-    for bus_idx in net.bus.index:
-        graph.add_node(int(bus_idx))
+    """Active bus graph honoring line in_service and switch states.
 
-    if hasattr(net, "line"):
-        for _, row in net.line.iterrows():
-            graph.add_edge(int(row["from_bus"]), int(row["to_bus"]))
+    Delegates to topology.active_bus_graph so adjacency and static features are
+    built on the true operational topology. The previous implementation added
+    every line/trafo regardless of switch/in_service state, producing a meshed
+    graph on feeders that are radial in operation (ADR-0002 §4.1).
+    """
+    from .topology import active_bus_graph
 
-    if hasattr(net, "trafo"):
-        for _, row in net.trafo.iterrows():
-            graph.add_edge(int(row["hv_bus"]), int(row["lv_bus"]))
-
-    return graph
+    return active_bus_graph(net)
 
 
 def _build_load_adjacency_matrix(net: Any, graph: Any, sorted_nodes: list[tuple[str, float]]) -> tuple[tuple[float, ...], ...]:

@@ -1,6 +1,8 @@
 # 06 — Theory Sketch
 
-> Last revised 2026-04-22. Owned by the collaborator. Target statements of the theorems we want in the paper, with proof directions and known obstacles. This file is intentionally a sketch — formalization happens in LaTeX once the statements stabilize.
+> Last revised 2026-06-16 (was 2026-04-22). Owned by the collaborator. Target statements of the theorems we want in the paper, with proof directions and known obstacles. This file is intentionally a sketch — formalization happens in LaTeX once the statements stabilize.
+>
+> **2026-06-16 reframing (ADR-0001):** the projection target is now the **flow-constrained** polytope `Delta_grid` (adds outage + branch-flow capacity to box+budget); Theorem 2 updated below. The transfer bound (Thm 1) is read on the primary continuity metric `C`. Theorem 2's projection scheme is decided: cvxpylayers/OptNet first, laminar tree-DP as the efficient variant (`notes/work_order_fanchen_2026-06-16.md`).
 
 ## 1. Notation
 
@@ -40,23 +42,24 @@ and bounded loss ℓ ≤ B, with probability ≥ 1 − δ over the training samp
 
 ## 3. Target Theorem 2 — Feasibility guarantee for the projection
 
-**Statement (target).** Let f_proj : ℝⁿ × ℝ₊ⁿ × ℝ₊ → ℝ₊ⁿ be the projection layer taking (weights w, demands d, budget P). Then for any input, the output a = f_proj(w, d, P) satisfies exactly:
+**Statement (target).** Let f_proj be the projection onto `Delta_grid` taking (scores z, demands d, budget P, outage O, tree T with capacities F). Then for any input, the output a = f_proj(z, d, P, O, T) satisfies exactly:
   (i) a ≥ 0, elementwise;
   (ii) a ≤ d, elementwise;
-  (iii) Σ a ≤ P.
+  (iii) a_i = 0 for i ∈ O;
+  (iv) Σ a ≤ P;
+  (v) |f_e(a)| ≤ F_e for every tree edge e, where f_e(a) = Σ_{j∈subtree(e)} a_j.
 
-**Reading.** The policy cannot output infeasible allocations, by construction.
+**Reading.** The policy cannot output infeasible allocations — including branch-flow-overloading ones — by construction.
 
-**Proof direction.** Express the projection as the solution to
-  min_a ‖a − g(w, d, P)‖²  s.t.  0 ≤ a ≤ d, Σ a ≤ P
-for some scoring map g. The feasible set is a compact convex polytope; projection onto it is unique and satisfies the three inequalities by the KKT conditions. The remaining work is to show a closed-form or fixed-number-of-iteration scheme and prove it returns the true projection.
+**Proof direction.** Express the projection as
+  min_a ‖a − z‖²  s.t.  a ∈ Delta_grid (constraints i–v).
+`Delta_grid` is a compact convex polytope (box + global budget + a *laminar* family of subtree-sum capacity constraints on a radial tree); projection onto it is unique and satisfies i–v by KKT. Remaining work: a correct, differentiable scheme.
 
-**Candidate schemes.**
-- Dual-variable bisection on the budget Lagrangian (classic water-filling; O(n log n)).
-- Sort-based closed form with a threshold τ (O(n log n)).
-- Dykstra's algorithm (converges; needs iteration bound for differentiable training).
+**Decided schemes (2026-06-16).**
+- **Primary:** differentiable convex-optimization layer (cvxpylayers/OptNet), backprop via KKT/implicit differentiation. Reference (non-diff) solver already exists: `src/sg_resilience/flow_projection.py` — the correctness oracle.
+- **Efficient variant (stretch contribution):** near-linear **laminar tree-DP** — because the subtree-sum constraints are nested along root→leaf paths, the active set is laminar; per-subtree monotone price curves give an O(n log n) projection, differentiable on the active set via implicit differentiation. (Algorithm sketch in `notes/work_order_fanchen_2026-06-16.md`.)
 
-Collaborator chooses one; we prove correctness.
+Correctness gate: matches the reference solver within `epsilon_feas`.
 
 ## 4. Target Theorem 3 — CVaR-minimax regret bound
 
@@ -78,8 +81,8 @@ This lets us argue that the GNN class is "just expressive enough" for the proble
 
 ## 6. What the theory does NOT promise
 
-- No physical / AC-power-flow safety guarantee. Feasibility here means the allocation polytope, not the grid manifold.
-- No guarantee on continuity under arbitrary adversaries; only under the distribution-shift metric d_WL.
+- No physical / AC-power-flow safety guarantee. Feasibility means membership in `Delta_grid` (box + budget + outage + **linear radial branch-flow capacity**), not the AC grid manifold.
+- No guarantee on continuity under arbitrary adversaries; only under the distribution-shift metric d_struct.
 - No guarantee on cross-grid-type transfer.
 
 These are called out in the paper's Limitations section.

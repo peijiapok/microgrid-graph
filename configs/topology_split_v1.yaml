@@ -1,67 +1,109 @@
-# Topology Split v1 — first frozen split for evaluating zero-shot
-# topology generalization (contribution C2, see docs/02_research_goal.md).
+# Topology Split v1 — frozen split for zero-shot topology generalization (C2).
+# Validated 2026-06-16 by scripts/validate_feeders_v1.py; see notes/adr/0002-v1-feeder-split.md.
 #
-# Invariants (see docs/05_experimental_protocol.md §1):
-#   1. No feeder appears in both G_train and G_ood.
-#   2. At least one OOD feeder has |V| > max |V| in G_train (size-gen).
-#   3. At least one OOD feeder has topology class unseen in G_train.
-#   4. d_struct(G_train-distribution, G_ood) computed and reported per feeder
-#      once configs/feeder_atlas.yaml (C6) is populated.
+# Invariants (docs/05_experimental_protocol.md §1 Split Rules):
+#   1. No feeder appears in both G_train and G_ood.            -> satisfied
+#   2. >=1 OOD feeder with |V| > max |V| in G_train (size-gen).-> MVLV-urban (242,249) > rural3 (118)
+#   3. >=1 OOD feeder with feeder_type unseen in G_train.      -> urban (train: rural+semiurban only)
+#   4. Class labels (radiality, feeder_type) recorded per feeder. -> below
 #
-# Status: proposed, not yet validated by tests/. See Issue #3.
+# ADR-0001 requirement: every feeder must be RADIAL (subtree-sum flow constraints).
+#   All feeders below are radial once line in_service / open switches are honored.
+#   NOTE: benchmark_loader._build_network_graph must be fixed to honor switch
+#   states (ADR-0002 §4.1) before these graphs are correct.
+#
+# Status: proposed-frozen, pending one Fanchen-coupled check (ADR-0002 §5) and
+# the loader radiality fix. Not yet validated by tests/.
 
 version: 1
-frozen_at: 2026-04-23
-invariants_satisfied: [size_gen, class_gen]  # (4) pending atlas
+frozen_at: 2026-06-16
+supersedes: 2026-04-23
+invariants_satisfied: [no_overlap, size_gen, class_gen, labels_recorded]
+validation_script: scripts/validate_feeders_v1.py
+adr: notes/adr/0002-v1-feeder-split.md
 
 G_train:
   - id: case33bw
     source: pandapower
-    approx_n_loads: 32
-    class: radial_small
+    code: case33bw
+    n_loads: 32
+    class: [radial, semiurban]
+    radial: true            # 5 tie-lines are in_service=False
+    line_cap_coverage: 1.0
+    line_capacity_mw_override: 6.0   # ASSUMPTION: canonical case33bw has no thermal data;
+                                     # pandapower max_i_ka -> F_e ~2e6 MW (placeholder). 6.0 MVA
+                                     # ~274 A at 12.66 kV (modest MV lateral). Pass to
+                                     # topology.build_radial_tree(line_capacity_mw=6.0).
+                                     # At 3.715 MW peak the head edge is SLACK -> case33bw is the
+                                     # budget-binding train feeder; SimBench feeders carry the
+                                     # flow-binding topology evidence. Revisit if needed (ADR-0002 §5).
     loader: load_public_benchmark_scenario
-    note: "Standard pandapower benchmark feeder."
+    note: "Standard pandapower benchmark; radial base config. Synthetic demand profile."
 
-  - id: simbench_rural1
+  - id: simbench_lv_rural2
     source: simbench
-    approx_n_loads: 40
-    class: rural_lv
+    code: "1-LV-rural2--0-sw"
+    n_loads: 99
+    class: [radial, rural]
+    radial: true
+    line_cap_coverage: 1.0
     loader: load_public_benchmark_scenario
-    note: "SimBench LV rural variant 1."
 
-  - id: simbench_rural2
+  - id: simbench_lv_rural3
     source: simbench
-    approx_n_loads: 60
-    class: rural_lv
+    code: "1-LV-rural3--0-sw"
+    n_loads: 118
+    class: [radial, rural]
+    radial: true
+    line_cap_coverage: 1.0
     loader: load_public_benchmark_scenario
-    note: "SimBench LV rural variant 2."
 
 G_ood:
-  - id: simbench_lv_urban
+  - id: simbench_lv_urban6
     source: simbench
-    approx_n_loads: 100
-    class: urban_lv
-    loader: load_public_benchmark_scenario
-    satisfies: [class_gen, size_gen]
-    note: "Denser urban LV; distinct class from all G_train."
-
-  - id: ieee_34
-    source: pandapower
-    approx_n_loads: 34
-    class: radial_medium
-    loader: load_public_benchmark_scenario
+    code: "1-LV-urban6--0-sw"
+    n_loads: 111
+    class: [radial, urban]
+    radial: true
+    line_cap_coverage: 1.0
     satisfies: [class_gen]
-    note: "Classic IEEE 34-bus test feeder. TODO confirm pandapower loader name."
-
-  - id: ieee_123
-    source: pandapower            # may require OpenDSS converter — verify at load
-    approx_n_loads: 123
-    class: radial_large
     loader: load_public_benchmark_scenario
-    satisfies: [size_gen, class_gen]
-    note: "Largest OOD feeder; tests size-gen hardest. Fallback if loader unavailable: drop from v1 and add synthetic radial of similar size."
+    note: "Urban LV; feeder_type absent from G_train."
 
-# To be populated by C6 once `configs/feeder_atlas.yaml` is filled.
+  - id: simbench_mvlv_urban_5303
+    source: simbench
+    code: "1-MVLV-urban-5.303-0-sw"
+    n_loads: 242
+    class: [radial, urban]
+    radial: true            # 15 open line-switches
+    line_cap_coverage: 1.0
+    satisfies: [size_gen, class_gen]
+    loader: load_public_benchmark_scenario
+    note: "Larger than all G_train (size-gen). MV+LV with 3 trafos; edge caps mix line ampacity + trafo sn_mva."
+
+  - id: simbench_mvlv_urban_6305
+    source: simbench
+    code: "1-MVLV-urban-6.305-0-sw"
+    n_loads: 249
+    class: [radial, urban]
+    radial: true
+    line_cap_coverage: 1.0
+    satisfies: [size_gen, class_gen]
+    loader: load_public_benchmark_scenario
+    note: "Third OOD feeder for robustness."
+
+rejected:
+  - id: simbench_lv_rural1
+    code: "1-LV-rural1--0-sw"
+    reason: "Only 13 loads; too small for claim-bearing training (docs/11)."
+
+deferred_to_v2:
+  - ieee_34
+  - ieee_123
+  # OpenDSS->pandapower conversion off the v1 critical path; MVLV-urban gives a
+  # validated larger radial OOD without conversion risk. Keep for v2 C6 pair count.
+
+# Populated by C6 in v2 (configs/feeder_atlas.yaml).
 d_struct_report:
   atlas_version: null
   pairwise_distances: {}

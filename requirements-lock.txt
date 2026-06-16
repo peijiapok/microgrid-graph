@@ -1,0 +1,20 @@
+# Dependency gate lock note
+
+Generated for Cut A item 1 on 2026-05-09.
+
+This is not a full resolver lockfile. It records the environment versions that
+passed the atomic research execution plan dependency import gate.
+
+```text
+pandapower==3.4.0
+simbench==1.6.2
+networkx==3.6.1
+torch==2.6.0+cu124
+PyYAML==6.0.3
+```
+
+Verification command:
+
+```bash
+python -c "import pandapower, simbench, networkx, torch, yaml"
+```
