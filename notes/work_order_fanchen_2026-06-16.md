@@ -2,6 +2,20 @@
 
 > Supersedes the discussion-framed `notes/message_to_fanchen_2026-06-16.md`. This is directive: the design is decided; these are your two implementation tasks with acceptance gates. Specs cross-checked with GPT-5.5. Date 2026-06-16.
 
+## P0 — Investigate the topology-non-causal diagnostic FIRST (added 2026-06-17)
+Before building C1/C3, look at `notes/h1_negative_finding.md`. A preliminary
+diagnostic from Jia's side (quick GraphSAGE/DeepSets, NOT your C1) found: under
+congestion + LP-optimal training, real-graph ≈ wrong-graph (degree-preserving
+rewire) ≈ +0.002, while message-passing beats no-graph by +0.09 — i.e. the
+*actual feeder topology may be non-causal* for the learned decision because
+feasibility is delegated to a shared topology-aware allocator. This is YOUR
+domain to adjudicate: is there a graph operator/representation/decision where the
+real topology is genuinely load-bearing, or does this kill C1/C2/C6 and we pivot
+(reconfiguration/AC, or a negative-result paper)? Your call — but engage with
+this before investing in C1/C3, because if topology is non-causal the operator
+work is moot. Confound checklist (harsher wrong-graph controls, headroom-to-oracle,
+feature-only predictor, multi-seed CIs) is in the finding note.
+
 ## 0. Direction (decided — not open for re-scoping)
 - **Primary objective = temporal continuity** of critical-load service (ADR-0001). Adequacy is a guard, not the target.
 - **Feasible set is flow-constrained** `Δ_grid` (radial subtree-sum capacity limits). This is **Path A** (full design in v1; quality over the 2026 workshop deadline).
