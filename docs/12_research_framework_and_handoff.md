@@ -140,11 +140,30 @@ Jia (lead) to decide A vs B vs C — *after* Fanchen engages with P0 (§5.1).
 
 ---
 
-## 5. What Fanchen is expected to do (in detail)
+## 5. What Fanchen is expected to do (CORRECTED — see `notes/work_order_fanchen_2026-07-06.md`)
 
-His domain (per `docs/04` / collaborator brief): C1 (flow-aware operator), C2
-(topology-generalization protocol), C3 (differentiable projection, joint), C4
-(CVaR theory), C6 (d_struct atlas). **But P0 comes first.**
+> **Correction (2026-07-06):** an earlier version framed Fanchen around a GNN
+> control operator (C1). After reading his ICDM 2025 paper (random graph models /
+> structural graph mining, Bu & Shin), his role is repositioned onto the
+> **structure** side — his actual specialty. The GNN-control H1 in §3 is a
+> **separate, preliminary control-side probe**, orthogonal to his research.
+
+His three tasks (full detail + entry points in the new work order):
+- **F1 — feeder structural atlas + `d_struct` (C6/C2):** graph-mining fingerprints
+  (degree/spectral/motif/community) per feeder; a computable structural distance.
+  Caveat: radial feeders are trees (clustering≈0) → use tree-native features.
+- **F2 — RGM-based synthetic radial-feeder generation (his signature, highest-leverage):**
+  generate structurally-controlled synthetic feeders to expand the family from
+  6 → dozens (v2 needs ≥20 topology pairs). Adapt his generation machinery to trees.
+- **F3 — does structure predict transfer?** the core graph contribution, independent
+  of whether the *control* uses a GNN. Honest hypothesis given §3: "transfer
+  *difficulty* is/isn't predictable from structure."
+
+C1 (GNN control operator) is **deprioritized and not his specialty**; C3
+(projection) is Jia's. The subsections below are the OLD C1/C3-centric framing —
+retained for history but superseded by the new work order.
+
+### (OLD, superseded) detail below
 
 ### 5.1 P0 — adjudicate the topology-causality question (do this FIRST)
 Before building operators, determine whether the real feeder topology is
@@ -201,15 +220,16 @@ Plug a new operator into `policies.build_policy` (score head), train via
 
 ---
 
-## 6. Division of labor (current)
+## 6. Division of labor (CORRECTED 2026-07-06)
 | Area | Owner |
 |---|---|
-| Resilience env, feasibility/flow infra, metrics, eval methodology, baselines, diagnostics | Jia (done) |
-| C1 flow-aware operator, C2 transfer protocol, C6 atlas/d_struct | Fanchen |
-| C3 differentiable projection | Joint (reference done by Jia; differentiable = Fanchen) |
-| C4 CVaR theory | Fanchen lead |
-| P0 topology-causality adjudication | Fanchen (uses Jia's diagnostics) |
-| Paper direction (A/B/C) | Jia (lead), after P0 |
+| Resilience env, feasibility/flow infra, metrics, eval methodology, control baselines, control-side H1 probe | Jia |
+| **Structural feeder atlas + `d_struct` (F1/C6/C2)** | **Fanchen** |
+| **RGM-based synthetic radial-feeder generation (F2)** | **Fanchen** |
+| **Does structure predict transfer? (F3)** | **Fanchen lead**, Jia provides control/eval |
+| C3 projection (reference done; differentiable optional) | Jia |
+| C1 GNN control operator (deprioritized, not Fanchen's specialty) | Jia/joint, if pursued |
+| Paper direction | Jia (lead) |
 
 ---
 

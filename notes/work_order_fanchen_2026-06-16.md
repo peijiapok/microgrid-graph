@@ -1,5 +1,7 @@
 # Work order — Fanchen (C1, C3). Direction set by lead (Jia).
 
+> **SUPERSEDED by `notes/work_order_fanchen_2026-07-06.md`** — this version wrongly framed Fanchen around a GNN control operator (C1). His actual expertise (ICDM 2025, random graph models / structural graph mining) puts him on the STRUCTURE side (d_struct, feeder atlas, RGM-based feeder generation), not the control operator. Kept for history only.
+
 > Supersedes the discussion-framed `notes/message_to_fanchen_2026-06-16.md`. This is directive: the design is decided; these are your two implementation tasks with acceptance gates. Specs cross-checked with GPT-5.5. Date 2026-06-16.
 
 ## P0 — Investigate the topology-non-causal diagnostic FIRST (added 2026-06-17)

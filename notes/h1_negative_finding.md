@@ -2,18 +2,20 @@
 
 > RESOLVED into a conditional result (stronger than pure negative). Pilot + decision-room diagnostics + congestion sweep + B-viability test (GPT-5.5-guided).
 
-## OWNERSHIP NOTE (read first)
-The **graph-learning side (C1 flow-aware operator, C2 topology-generalization, C6
-d_struct) is Fanchen's**, per `docs/04` / the collaborator brief. The H1
-experiments below were run from Jia's resilience/empirics side using a **quick
-GraphSAGE/DeepSets**, NOT Fanchen's designed C1. So this is a **preliminary
-diagnostic to hand to Fanchen**, not a unilateral verdict on his contributions.
-The substantive, operator-somewhat-independent finding is **formulation-level**:
-delegating feasibility to a shared topology-aware allocator makes the policy's
-decision topology-light (GPT-5.5: "largely inevitable"). Fanchen owns the
-response: show a graph operator/formulation where topology is genuinely causal,
-or agree to pivot. Do NOT treat "C1/C2/C6 not supported" as settled until Fanchen
-has engaged with his own implementation.
+## SCOPE NOTE (read first — corrected 2026-07-06)
+This is a **control-side probe** about whether a *GNN control policy* needs
+topology, run from Jia's side with a quick GraphSAGE/DeepSets. It is **NOT** a
+verdict on Fanchen's research. Fanchen's actual work (ICDM 2025, random graph
+models / structural graph mining) is on the **structure** side — `d_struct`,
+feeder structural fingerprints, and RGM-based feeder generation (F1–F3 in
+`notes/work_order_fanchen_2026-07-06.md`) — a **different question this
+experiment does not touch.** "Does feeder structure predict transfer?" (his) is
+wide open; "does a GNN *control policy* need topology?" (this note) is the narrow
+thing probed here. The substantive, operator-somewhat-independent finding is
+formulation-level: delegating feasibility to a shared topology-aware allocator
+makes the policy's *decision* topology-light (GPT-5.5: "largely inevitable"). Do
+NOT read this as "the graph research is infeasible" — it says nothing about the
+structural approach.
 
 ## PRELIMINARY DIAGNOSTIC (2026-06-17, sparse topology + wrong-graph control)
 The wrong-graph control overturns the earlier optimistic read. With the **real
