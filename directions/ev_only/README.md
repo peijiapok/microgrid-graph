@@ -109,7 +109,46 @@ trained over a damage distribution vs re-solving each). State this explicitly.
 - **New here:** mission-aware readiness dynamics, fleet-level readiness-continuity
   metric, limited-mobility charger assignment, damage-scenario generation.
 
-## HEADLINE RESULT — V2G coordination has an interior optimum (`ev_v2g.py`)
+## HEADLINE — Adaptive V2G control is necessary and robust (`ev_resilience.py`)
+The V2G tradeoff has an **interior optimum whose location shifts with grid
+degradation** (below), so *no fixed V2G level is robust* — v2g=0 starves charging
+when the feed is weak, v2g=1 over-drains EVs, v2g=0.5 fails at the weakest feeds.
+An **adaptive controller** (deliver just enough V2G to free grid budget for the
+step's emergency-charging need, draining regular EVs first) **matches or beats
+every fixed level at every degradation level** on emergency-service continuity:
+
+| feed | v2g=0 | v2g=0.5 | v2g=1 | **ADAPTIVE** |
+|---|---|---|---|---|
+| 0.6 | 0.00 | 0.00 | 0.79 | **0.86** |
+| 0.8 | 0.00 | 0.93 | 0.80 | **0.94** |
+| 1.0 | 0.00 | 0.97 | 0.80 | **0.97** |
+| 1.5 | 0.99 | 0.97 | 0.80 | **0.99** |
+
+**Robustness sweep** (feed 0.8, ESC; margin = adaptive − *hindsight-best* fixed):
+adaptive wins in **14/15** parameter settings (mission rate, drain, θ, damage,
+fleet size), margin +0.01…+0.12, **growing in harder regimes** (mission rate 5 →
++0.12); one small exception (θ=0.5, −0.02, an easy regime). Since best-fixed is an
+oracle chosen per-setting, adaptive matching it *without hindsight* is the result.
+
+**Regular-EV equity finding:** V2G drains regular EVs first, so under scarcity
+**regular-EV evacuation-readiness collapses** (reg_evac ≈0.01) — the equity cost
+of keeping hospitals+ambulances alive. Adaptive recovers it fastest as the feed
+improves (0.80 vs 0.38 for fixed-0.5 at feed 1.5).
+
+**The contribution:** in a degraded post-disaster microgrid, keeping hospitals AND
+emergency-EV readiness alive requires *adaptive* V2G coordination — any fixed
+policy fails at some grid-degradation level, and the equity burden falls on
+regular EVs. A control principle with a clear necessity argument and a policy
+message (V2G must be state-adaptive, not on/off).
+
+## Metrics (literature-grounded)
+- **RC — readiness continuity** (headline; availability analogue of SAIDI): fraction of time ≥N_min emergency vehicles are dispatch-ready.
+- **ESC — emergency service continuity** (outcome; EENS/EUE analogue) = 1 − unserved/arrived emergency missions = fraction of emergency demand served. GPT-5.5 + resilience literature: pair the continuity proxy with this outcome and show they correlate.
+- **hosp_avail** = 1 − hospital Energy-Not-Served fraction (ENS, VoLL-weighted critical load, per hospital-microgrid resilience work).
+- **reg_evac** = regular-EV evacuation service (fraction charged to evacuation SOC over time).
+- **V2G round-trip efficiency ~85%** (empirical) — draining E from EVs delivers 0.85E to the hospital.
+
+## HEADLINE RESULT — V2G coordination has an interior optimum (`ev_v2g.py`, superseded by adaptive framing above)
 Under a **degraded post-disaster grid feed** (~hospital-scale), the fraction of
 the hospital served from EV batteries (V2G) that maximizes emergency readiness is
 **interior, not extreme** (IEEE-33, damaged, 24 h, `results/v2g_frontier.json`):
@@ -144,3 +183,21 @@ End-to-end on IEEE-33 (`ev_fleet.py` + `damage.py` + `ev_scenario.py` + `run_ev_
 - [ ] Damage-scenario generator — feeder-segment/charger outages producing varied surviving topologies (with Fanchen's generation for scale).
 - [ ] `_FeederCtx` adapter placing hospitals + emergency/regular chargers on buses.
 - [ ] First result: readiness-continuity of a priority heuristic vs OPF vs topology-aware policy, under damaged topologies.
+
+## References (peer-reviewed, for grounding & related work)
+V2G / EV for resilience & critical-load / hospital support:
+- Resilience-oriented optimization of hospital microgrids (ESS+PV, VoLL-tiered critical load, ENS ↓55–63%, ≥95% life-critical supply), *Scientific Reports* 2026. https://www.nature.com/articles/s41598-026-34992-x
+- Enhancing Active Distribution Network Resilience with V2G-Powered Pre- and Post-Disaster Coordination, *Symmetry* (MDPI) 2026. https://doi.org/10.3390/sym18030523
+- Impacts of Privately Owned EVs on Distribution System Resilience (multi-agent optimization). https://arxiv.org/abs/2105.03828
+- Critical Load Restoration using DERs for Resilient Power Distribution (EVs as mobile storage; recovery >85%). https://arxiv.org/abs/1912.04535
+- Power System Resilience: Role of EVs and Social Disparities in US Outages, *Smart Grids & Sustainable Energy* (Springer) 2024. https://link.springer.com/article/10.1007/s40866-024-00204-6
+
+V2G round-trip efficiency (~80–87%):
+- Empirical Evaluation of V2G Round-trip Efficiency, *IEEE* 2020. https://ieeexplore.ieee.org/document/9203459/
+- Vehicle-to-Grid/Home Round-trip Efficiency, *JRC* (EU) JRC123942. https://publications.jrc.ec.europa.eu/repository/handle/JRC123942
+
+Resilience / reliability metrics (ENS/EENS, SAIDI/SAIFI, availability):
+- Reconceptualizing Reliability Indices as Metrics to Quantify Distribution Resilience, *Energies* (MDPI) 17(8):1909. https://www.mdpi.com/1996-1073/17/8/1909
+- SAIDI / SAIFI / Expected Unserved Energy (standard definitions). https://en.wikipedia.org/wiki/SAIDI · https://en.wikipedia.org/wiki/Expected_unserved_energy
+
+Electric emergency vehicles (motivation): electric ambulance/fire/police pilots (JP/KR/CN/AU); mobile EV charging for emergency fleets.

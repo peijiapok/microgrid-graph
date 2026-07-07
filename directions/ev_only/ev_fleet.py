@@ -111,10 +111,15 @@ class EVFleet:
 
         return {
             "readiness": self.readiness(),
+            "missions_arrived": int(n_new),
             "missions_failed": missions_failed,
             "mean_soc": float(np.mean(self.soc)),
             "min_emergency_soc": float(np.min(self.soc[self.is_emergency])) if self.is_emergency.any() else 1.0,
         }
+
+    def evac_ready(self, evac_target: float = 0.5) -> int:
+        """# regular EVs with enough charge to evacuate (SOC >= target)."""
+        return int(np.sum((~self.is_emergency) & (self.on_mission == 0) & (self.soc >= evac_target)))
 
 
 def readiness_continuity(readiness_series: np.ndarray, n_min: int) -> float:
