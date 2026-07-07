@@ -109,6 +109,13 @@ trained over a damage distribution vs re-solving each). State this explicitly.
 - **New here:** mission-aware readiness dynamics, fleet-level readiness-continuity
   metric, limited-mobility charger assignment, damage-scenario generation.
 
+## First-result findings (2026-07-08)
+End-to-end on IEEE-33 (`ev_fleet.py` + `damage.py` + `ev_scenario.py` + `run_ev_first.py`):
+- **Model works.** As disaster damage grows (more lines removed → fewer surviving nodes), readiness continuity 1.0→0.49, hospital continuity 1.0→0.50, emergency missions-failed 0→36. The V2G-readiness tradeoff is representable (demo).
+- **Connectivity dominates.** Which nodes *survive* the damage is the first-order driver of readiness (reachability). Any allocator that only serves surviving nodes captures this.
+- **Degraded feed → a real control problem.** With slack line caps (6 MVA) branch-flow doesn't bite (budget binds). Under a degraded/congested feed (~1 MVA, physically plausible post-disaster), the allocation *decision* matters a lot — controllers diverge by ~0.6 readiness-continuity.
+- **BUT topology-causality is NOT yet shown (confound).** flow-aware-greedy vs blind-then-projected differ mainly by *strategy* (concentrate vs spread): greedy serves a few chargers fully and starves the rest; for fleet readiness, spreading min-charge across many emergency vehicles wins. So the comparison measures strategy, not topology-awareness. Same lesson as the main line — don't claim topology matters until isolated with a **matched controller** (same strategy ± flow-knowledge) and a proper optimizer/learned policy.
+
 ## 9. Next steps
 - [ ] `ev_fleet.py` — mission-aware emergency + regular EV fleet: SOC, θ, missions (Poisson dispatch, drain, return), charger assignment (reachable/energized set).
 - [ ] `readiness_metric.py` — fleet readiness `R(t)` + readiness-continuity (specializes `metrics_v1`).
