@@ -4,6 +4,20 @@
 > (`src/sg_resilience/`: `Δ_grid` allocation, continuity metric, oracle-calibrated
 > eval, topology). Problem sharpened with GPT-5.5 (2026-07-07).
 
+## 0. Decisions locked (2026-07-08)
+- **Network:** IEEE test feeders (13 / 33 / 34 / 123; case33bw already in pipeline). Damaged variants (remove lines → islands) = the topology family; Fanchen's RGM generation expands it. **Simulation study first; real EMS/EV/outage data deferred.**
+- **Action (1a):** per-charger power allocation; vehicles pre-assigned to chargers (no routing).
+- **Dispatch (2):** only *ready* vehicles dispatch; if none ready, emergency mission **fails** (counted). Trained proxy = **readiness continuity** (continuous power to keep chargers/vehicles served); report **missions-failed** as the outcome.
+- **Objective (3):** lexicographic — hospital service ≫ emergency-EV readiness ≫ regular-EV fairness.
+- **Time (4):** 15-min steps; primary 24 h (96 steps), robustness 72 h (288 steps).
+- **Supply (5):** degraded grid import + renewables (solar/wind) + storage + **V2G** as the core. **SMR = named add-on, deferred.**
+- **Readiness (6):** count-based (`R(t)=#ready emergency vehicles`); small microgrid → spatial coverage deferred.
+- **Fleet (8):** all EVs modeled; ambulance/emergency readiness is the priority focus in the emergency.
+- **Scope (10):** standalone paper.
+- **Venue (9):** aim **Nature Energy** on the *insight* (electrified emergency-response blackout vulnerability + the **V2G-vs-readiness tradeoff**); fallback ladder Joule / Nature Comms / Applied Energy / IEEE TSG. IEEE feeders are the testbed, not the NE grounding — data layer added later.
+
+**Core novel element:** the **V2G-vs-readiness tradeoff** — draining an ambulance's battery (V2G) to keep a hospital powered *now* costs its dispatch *readiness* later.
+
 ## 1. Story & setting
 A near-future, fully-electrified world. A disaster (earthquake, storm) damages
 the distribution grid: the surviving feeder is **partially destroyed / islanded
