@@ -109,6 +109,28 @@ trained over a damage distribution vs re-solving each). State this explicitly.
 - **New here:** mission-aware readiness dynamics, fleet-level readiness-continuity
   metric, limited-mobility charger assignment, damage-scenario generation.
 
+## HEADLINE RESULT — V2G coordination has an interior optimum (`ev_v2g.py`)
+Under a **degraded post-disaster grid feed** (~hospital-scale), the fraction of
+the hospital served from EV batteries (V2G) that maximizes emergency readiness is
+**interior, not extreme** (IEEE-33, damaged, 24 h, `results/v2g_frontier.json`):
+| V2G level | hospital continuity | readiness continuity | missions failed |
+|---|---|---|---|
+| 0.00 (never V2G) | 1.00 | **0.00** | 75 |
+| 0.25 | 1.00 | 0.90 | 2 |
+| 0.50 | 1.00 | **0.91** | 2 |
+| 0.75 | 1.00 | 0.84 | 5 |
+| 1.00 (all V2G) | 1.00 | 0.75 | 11 |
+
+- **v2g = 0:** the scarce grid is entirely consumed by the hospital → EVs never charge → **emergency readiness collapses, 75 missions fail.**
+- **v2g = 1:** EVs over-drained → readiness 0.75.
+- **v2g ≈ 0.25–0.5:** hospital served **and** readiness ~0.9 — both objectives met.
+
+**Insight (the paper's spine):** *coordinated V2G at the right level lets a degraded
+microgrid keep both the hospital powered and the emergency fleet dispatch-ready —
+but only in a narrow band; mismanaging V2G in either direction is catastrophic for
+emergency response.* A design principle with a clear optimum and a policy message
+(you need intelligent V2G coordination, not on/off) — the Nature-Energy-flavored contribution.
+
 ## First-result findings (2026-07-08)
 End-to-end on IEEE-33 (`ev_fleet.py` + `damage.py` + `ev_scenario.py` + `run_ev_first.py`):
 - **Model works.** As disaster damage grows (more lines removed → fewer surviving nodes), readiness continuity 1.0→0.49, hospital continuity 1.0→0.50, emergency missions-failed 0→36. The V2G-readiness tradeoff is representable (demo).
